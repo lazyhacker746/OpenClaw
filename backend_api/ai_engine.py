@@ -1,13 +1,18 @@
+import os
 import json
 import time
 from openai import OpenAI
+from dotenv import load_dotenv
 
-# Configured for Local Ollama
+# Load environment variables
+load_dotenv()
+
+# Pointing back to GitHub's Azure endpoint for Codespaces development
+token = os.environ.get("GITHUB_TOKEN")
 client = OpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"
+    base_url="https://models.inference.ai.azure.com",
+    api_key=token,
 )
-
 
 def generate_pitch(shop_name, reviews, sadapay_link, mode, faults=None, use_ai=True, max_retries=2):
     if not use_ai:
@@ -18,7 +23,7 @@ def generate_pitch(shop_name, reviews, sadapay_link, mode, faults=None, use_ai=T
             return "Established Business", fault_str, f"Assalam o Alaikum {shop_name} team! Aapki website mein kuch technical issues hain ({fault_str}). Main inhein fix kar ke sales boost kar sakta hoon. Let's start: {sadapay_link}"
 
     reviews_text = "\n".join([f"- {r}" for r in reviews])
-
+    
     if mode == "1":
         prompt = f"""
         You are a highly professional web developer in Pakistan sending a WhatsApp pitch. 
@@ -35,7 +40,7 @@ def generate_pitch(shop_name, reviews, sadapay_link, mode, faults=None, use_ai=T
         Now, write a custom pitch for {shop_name} using this specific feedback from their reviews: {reviews_text}
         
         End the message EXACTLY with: 'Agar aap ready hain, toh let's start: {sadapay_link}'
-        Output strictly as JSON: {{'strength': '...', 'weakness': '...', 'pitch': '...'}}
+        Output strictly as JSON: {{"strength": "...", "weakness": "...", "pitch": "..."}}
         """
     else:
         fault_bullet_points = "\n".join([f"- {f}" for f in faults])
@@ -54,24 +59,24 @@ def generate_pitch(shop_name, reviews, sadapay_link, mode, faults=None, use_ai=T
         Also include a compliment based on their reviews: {reviews_text}
         
         End the message EXACTLY with: 'Agar aap ready hain, toh let's start: {sadapay_link}'
-        Output strictly as JSON: {{'strength': '...', 'weakness': '...', 'pitch': '...'}}
+        Output strictly as JSON: {{"strength": "...", "weakness": "...", "pitch": "..."}}
         """
+    
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
-                model="llama3",
+                model="gpt-4o", 
                 messages=[
-                    {"role": "system",
-                     "content": "You are a helpful sales assistant. Always reply in valid JSON format."},
+                    {"role": "system", "content": "You are a helpful sales assistant. Always reply in valid JSON format."},
                     {"role": "user", "content": prompt}
                 ],
-                response_format={"type": "json_object"}
+                response_format={ "type": "json_object" }
             )
             result = json.loads(response.choices[0].message.content)
             return result.get('strength', 'N/A'), result.get('weakness', 'N/A'), result.get('pitch', 'N/A')
-
+            
         except Exception as e:
             print(f"  [!] AI Error on attempt {attempt + 1}: {e}")
             time.sleep(2)
-
+                
     return "N/A", "N/A", "Pitch generation failed."

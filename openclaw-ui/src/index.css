@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Custom Scrollbar for a cleaner look */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #a855f7; /* Purple thumb */
+  border-radius: 10px;
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #6b7280; /* Gray thumb in dark mode */
+}
