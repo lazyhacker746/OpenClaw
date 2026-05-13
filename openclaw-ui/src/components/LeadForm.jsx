@@ -1,9 +1,8 @@
 import React from 'react';
-import { Search, Zap, Loader2, Crosshair } from 'lucide-react';
+import { Search, Zap, Loader2, Crosshair, ChevronDown } from 'lucide-react'; // <-- Added ChevronDown
 
 export default function LeadForm({ formData, handleInputChange, handleSubmit, loading }) {
   return (
-    /* QA FIX: Reduced padding from p-6 to p-4 on mobile so it breathes */
     <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-6 shadow-xl transition-colors duration-300">
       <div className="flex items-center space-x-2 mb-5 border-b border-gray-200 dark:border-gray-800 pb-3">
         <Search className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -36,15 +35,22 @@ export default function LeadForm({ formData, handleInputChange, handleSubmit, lo
           </div>
         </div>
 
+        {/* --- PRO-GRADE DROPDOWN FIX --- */}
         <div>
           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Targeting Strategy</label>
-          <select name="mode" value={formData.mode} onChange={handleInputChange}
-            className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-800 rounded-lg px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-purple-50 outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 appearance-none truncate">
-            {/* QA FIX: Shortened text so native mobile dropdowns don't overflow the screen */}
-            <option value="1">Target: Missing Website</option>
-            <option value="2">Target: Broken/Bad Website</option>
-          </select>
+          <div className="relative">
+            <select name="mode" value={formData.mode} onChange={handleInputChange}
+              className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-800 rounded-lg px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-purple-50 outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 appearance-none truncate cursor-pointer pr-10">
+
+              {/* Added explicit dark mode styling to the options */}
+              <option value="1" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">Target: Missing Website</option>
+              <option value="2" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">Target: Broken/Bad Website</option>
+            </select>
+            {/* Custom SVG Arrow */}
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          </div>
         </div>
+        {/* ------------------------------- */}
 
         <div>
           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">SadaBiz/Payment Link</label>
@@ -52,7 +58,6 @@ export default function LeadForm({ formData, handleInputChange, handleSubmit, lo
             className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-800 rounded-lg px-4 py-3 text-base sm:text-sm text-gray-900 dark:text-purple-50 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all" />
         </div>
 
-        {/* QA FIX: Changed items-center to items-start so checkbox stays at top if text wraps */}
         <div className="flex items-start space-x-3 pt-2 bg-purple-50 dark:bg-purple-900/20 p-3 sm:p-4 rounded-lg border border-purple-100 dark:border-purple-800/50">
           <div className="relative flex items-center mt-0.5 shrink-0">
             <input type="checkbox" name="use_ai" id="use_ai" checked={formData.use_ai} onChange={handleInputChange}

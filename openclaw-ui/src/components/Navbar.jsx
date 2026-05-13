@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, Search, Database } from 'lucide-react';
+import { Sun, Moon, Search, Users } from 'lucide-react';
 import Logo from './Logo';
 
 export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab }) {
@@ -35,8 +35,8 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab })
         <button
           onClick={() => setActiveTab('history')}
           className={`flex-1 md:flex-none flex justify-center items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${activeTab === 'history' ? 'bg-white dark:bg-black text-purple-600 dark:text-purple-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-          <Database className="w-4 h-4" />
-          <span>Database</span>
+          <Users className="w-4 h-4" />
+          <span>Lead Vault</span>
         </button>
       </div>
 

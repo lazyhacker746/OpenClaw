@@ -3,10 +3,12 @@ import Navbar from './components/Navbar';
 import LeadForm from './components/LeadForm';
 import ResultsTable from './components/ResultsTable';
 import HistoryDashboard from './components/HistoryDashboard';
+import LoginScreen from './components/LoginScreen';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isDark, setIsDark] = useState(true);
-  const [activeTab, setActiveTab] = useState('generator'); // <-- NEW STATE
+  const [activeTab, setActiveTab] = useState('generator');
 
   const [formData, setFormData] = useState({
     city: '',
@@ -74,6 +76,16 @@ export default function App() {
     a.click();
   };
 
+  // --- SECURITY LAYER ---
+  if (!isAuthenticated) {
+    return (
+      <div className={isDark ? "dark" : ""}>
+        <LoginScreen onLogin={() => setIsAuthenticated(true)} />
+      </div>
+    );
+  }
+
+  // --- MAIN APP LAYER ---
   return (
     <div className={isDark ? "dark" : ""}>
       <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0f] text-gray-800 dark:text-gray-300 relative overflow-hidden font-sans selection:bg-purple-500/30 transition-colors duration-300">
@@ -81,9 +93,9 @@ export default function App() {
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-500/10 dark:bg-purple-900/20 blur-[120px] rounded-full pointer-events-none transition-colors duration-300"></div>
         <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-500/10 dark:bg-blue-900/20 blur-[120px] rounded-full pointer-events-none transition-colors duration-300"></div>
 
-        {/* Pass the tab state to the Navbar */}
         <Navbar isDark={isDark} toggleTheme={toggleTheme} activeTab={activeTab} setActiveTab={setActiveTab} />
 
+        {/* Dynamic Mobile Padding (p-3 on phones, p-8 on laptops) */}
         <div className="relative z-10 max-w-7xl mx-auto p-3 sm:p-8">
           {activeTab === 'generator' ? (
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
@@ -105,7 +117,6 @@ export default function App() {
               </div>
             </div>
           ) : (
-            // If activeTab is 'history', show the massive Database table
             <HistoryDashboard />
           )}
         </div>

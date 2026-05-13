@@ -4,6 +4,8 @@ import { Search, Download, ShieldAlert, MessageCircle } from 'lucide-react';
 export default function ResultsTable({ results, loading, error, exportCSV }) {
   return (
     <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex-1 flex flex-col min-h-[600px] transition-colors duration-300">
+
+      {/* Header */}
       <div className="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
         <div className="flex items-center space-x-2">
           <Search className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -17,6 +19,7 @@ export default function ResultsTable({ results, loading, error, exportCSV }) {
         )}
       </div>
 
+      {/* Error Message */}
       {error && (
         <div className="bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-500/50 rounded-lg p-4 flex items-start space-x-3 text-red-700 dark:text-red-400 mb-6">
           <ShieldAlert className="w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -24,6 +27,7 @@ export default function ResultsTable({ results, loading, error, exportCSV }) {
         </div>
       )}
 
+      {/* Loading/Empty State */}
       {!loading && results.length === 0 && !error && (
         <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-600">
           <div className="relative mb-6">
@@ -34,40 +38,73 @@ export default function ResultsTable({ results, loading, error, exportCSV }) {
         </div>
       )}
 
+      {/* Populated Results Table */}
       {results.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800 custom-scrollbar">
-          <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300">
-            <thead className="text-xs uppercase bg-gray-50 dark:bg-black/60 text-purple-700 dark:text-purple-400/80 font-bold border-b border-gray-200 dark:border-gray-800">
-              <tr>
-                <th className="px-5 py-4 whitespace-nowrap">Business Name</th>
-                <th className="px-5 py-4">Total Reviews</th>
-                <th className="px-5 py-4">Website Status</th>
-                <th className="px-5 py-4">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800/50">
-              {results.map((lead, idx) => (
-                <tr key={idx} className="bg-white dark:bg-black/20 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors group">
-                  <td className="px-5 py-4 font-semibold text-gray-900 dark:text-gray-100">{lead['Business Name']}</td>
-                  <td className="px-5 py-4 font-bold text-purple-600 dark:text-purple-400">{lead['Review Count']}</td>
-                  <td className="px-5 py-4">
-                    {lead['Website Faults'] !== 'N/A' ? (
-                      <span className="text-red-600 dark:text-red-400 text-xs bg-red-100 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-2 py-1 rounded-md font-semibold">{lead['Website Faults']}</span>
-                    ) : (
-                      <span className="text-emerald-600 dark:text-emerald-400 text-xs bg-emerald-100 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-400/20 px-2 py-1 rounded-md font-semibold">No Website Found</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4">
-                    <a href={lead['WhatsApp Link']} target="_blank" rel="noreferrer" 
-                      className="inline-flex items-center space-x-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm">
-                      <MessageCircle className="w-4 h-4" />
-                      <span>Send Pitch</span>
-                    </a>
-                  </td>
+        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+
+          {/* MOBILE VIEW: Stacked Cards (Scrolls vertically) */}
+          <div className="block md:hidden divide-y divide-gray-200 dark:divide-gray-800/50 max-h-[500px] overflow-y-auto custom-scrollbar">
+            {results.map((lead, idx) => (
+              <div key={idx} className="p-4 bg-white dark:bg-black/20 space-y-3">
+                <div className="font-semibold text-gray-900 dark:text-gray-100 text-lg leading-tight">
+                  {lead['Business Name']}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-purple-600 dark:text-purple-400 text-xs font-bold bg-purple-100 dark:bg-purple-900/30 px-2 py-1 rounded-md">
+                    {lead['Review Count']} Reviews
+                  </span>
+                  {lead['Website Faults'] !== 'N/A' ? (
+                    <span className="text-red-600 dark:text-red-400 text-xs bg-red-100 dark:bg-red-400/10 px-2 py-1 rounded-md font-semibold">{lead['Website Faults']}</span>
+                  ) : (
+                    <span className="text-emerald-600 dark:text-emerald-400 text-xs bg-emerald-100 dark:bg-emerald-400/10 px-2 py-1 rounded-md font-semibold">No Website</span>
+                  )}
+                </div>
+                <div className="pt-2 border-t border-gray-100 dark:border-gray-800/50">
+                  <a href={lead['WhatsApp Link']} target="_blank" rel="noreferrer"
+                    className="w-full flex justify-center items-center space-x-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-sm">
+                    <MessageCircle className="w-5 h-5" />
+                    <span>Send Pitch</span>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* DESKTOP VIEW: Standard Table (Scrolls vertically with sticky header) */}
+          <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
+            <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300 relative">
+              <thead className="text-xs uppercase bg-gray-50 dark:bg-black/80 text-purple-700 dark:text-purple-400/80 font-bold sticky top-0 z-10 shadow-sm backdrop-blur-md">
+                <tr>
+                  <th className="px-5 py-4 whitespace-nowrap">Business Name</th>
+                  <th className="px-5 py-4">Total Reviews</th>
+                  <th className="px-5 py-4">Website Status</th>
+                  <th className="px-5 py-4">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800/50">
+                {results.map((lead, idx) => (
+                  <tr key={idx} className="bg-white dark:bg-black/20 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-colors group">
+                    <td className="px-5 py-4 font-semibold text-gray-900 dark:text-gray-100">{lead['Business Name']}</td>
+                    <td className="px-5 py-4 font-bold text-purple-600 dark:text-purple-400">{lead['Review Count']}</td>
+                    <td className="px-5 py-4">
+                      {lead['Website Faults'] !== 'N/A' ? (
+                        <span className="text-red-600 dark:text-red-400 text-xs bg-red-100 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-2 py-1 rounded-md font-semibold">{lead['Website Faults']}</span>
+                      ) : (
+                        <span className="text-emerald-600 dark:text-emerald-400 text-xs bg-emerald-100 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-400/20 px-2 py-1 rounded-md font-semibold">No Website Found</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      <a href={lead['WhatsApp Link']} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center space-x-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm">
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Send Pitch</span>
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
