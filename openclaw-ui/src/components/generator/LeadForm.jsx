@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Search, Zap, Loader2, Crosshair, ChevronDown, MapPin, Briefcase, Target, Link } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function LeadForm({ setLeads, setIsGenerating, isGenerating }) {
+export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user }) {
   const [city, setCity] = useState('');
   const [category, setCategory] = useState('');
   const [targetLeads, setTargetLeads] = useState(5);
@@ -35,7 +35,8 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating }) {
           min_reviews: Number(minReviews),
           mode: mode,
           use_ai: useAi,
-          sadapay_link: sadapayLink.trim() || "none"
+          sadapay_link: sadapayLink.trim() || "none",
+          user_id: user.id // 👈 Passes the logged-in user to the Python Backend
         })
       });
 

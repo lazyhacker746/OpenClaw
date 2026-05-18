@@ -22,11 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==========================================
-# ⚠️ PASTE YOUR SUPABASE ADMIN UID HERE
-# ==========================================
-ACTIVE_USER_ID = "4008d052-1316-4a23-8291-2bb16bb36b53"
-
+# ⚠️ Hardcoded ACTIVE_USER_ID has been REMOVED for Multi-Tenancy!
 
 class LeadRequest(BaseModel):
     city: str
@@ -36,9 +32,11 @@ class LeadRequest(BaseModel):
     mode: str
     use_ai: bool
     sadapay_link: str
+    user_id: str  # 👈 NEW: Catches the user identity from React
 
 class DeleteRequest(BaseModel):
     whatsapp_link: str
+    user_id: str  # 👈 NEW: Catches the user identity from React
 
 @app.post("/api/generate")
 def generate_leads(request: LeadRequest):
@@ -66,12 +64,12 @@ def generate_leads(request: LeadRequest):
 
             # --------------------------------------------------------------
             # Route to Supabase Cloud Vault
-            print(f"[+] Routing {len(results)} leads to Clarion Cloud Vault...")
+            print(f"[+] Routing {len(results)} leads to Clarion Cloud Vault for User {request.user_id}...")
             save_leads_to_db(
                 city=clean_data['city'],
                 category=clean_data['category'],
                 leads=results,
-                user_id=ACTIVE_USER_ID
+                user_id=request.user_id # 👈 NEW: Uses the dynamic user ID
             )
 
             print(f"[+] SUCCESS: Extracted {len(results)} targets.")
@@ -88,9 +86,10 @@ def generate_leads(request: LeadRequest):
 
 @app.post("/api/leads/delete")
 def delete_lead(request: DeleteRequest):
-    print(f"[!] User {ACTIVE_USER_ID} is deleting lead: {request.whatsapp_link}")
+    print(f"[!] User {request.user_id} is deleting lead: {request.whatsapp_link}")
     
-    success = delete_user_lead(ACTIVE_USER_ID, request.whatsapp_link)
+    # 👈 Passes dynamic user_id to ensure they only delete THEIR leads
+    success = delete_user_lead(request.user_id, request.whatsapp_link)
     
     if success:
         return {"status": "success", "message": "Lead permanently removed from vault."}
@@ -98,11 +97,11 @@ def delete_lead(request: DeleteRequest):
         return {"status": "error", "message": "Failed to delete lead from database."}
 
 @app.get("/api/history")
-def get_history():
-    print(f"[+] Fetching historical leads from Cloud Vault for User {ACTIVE_USER_ID}...")
+def get_history(user_id: str): # 👈 NEW: Catches the ?user_id= query parameter
+    print(f"[+] Fetching historical leads from Cloud Vault for User {user_id}...")
     try:
-        # Fetch from Supabase instead of SQLite
-        leads = get_user_vault(ACTIVE_USER_ID)
+        # Fetch from Supabase using the dynamic user_id
+        leads = get_user_vault(user_id)
         return {"status": "success", "data": leads}
     except Exception as e:
         print(f"[-] Database Error: {e}")

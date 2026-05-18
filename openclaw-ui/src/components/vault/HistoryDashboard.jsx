@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Users, Download, Clock, Loader2, MessageCircle, Filter, ChevronDown, Trash2, Calendar } from 'lucide-react';
 
-export default function HistoryDashboard() {
+export default function HistoryDashboard({ user }) { // 👈 1. Added user prop
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -10,11 +10,14 @@ export default function HistoryDashboard() {
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterDate, setFilterDate] = useState(''); // Calendar Date State
 
-  // 1. Fetch leads from the Python API
+  // 1. Fetch leads from the Python API (ISOLATED TO USER)
   useEffect(() => {
     const fetchHistory = async () => {
+      if (!user) return; // Safety check
+      
       try {
-        const response = await fetch('/api/history');
+        // 👈 2. Pass user_id to the backend so it ONLY grabs their leads
+        const response = await fetch(`/api/history?user_id=${user.id}`);
         const result = await response.json();
         if (result.status === 'success') {
           setHistory(result.data);
@@ -26,9 +29,9 @@ export default function HistoryDashboard() {
       }
     };
     fetchHistory();
-  }, []);
+  }, [user]); // 👈 React will re-run this if the user changes
 
-  // 2. DELETE LOGIC: Severs the magic link in Supabase
+  // 2. DELETE LOGIC: Severs the magic link in Supabase securely
   const handleDelete = async (whatsappLink, businessName) => {
     if (!window.confirm(`Are you sure you want to delete ${businessName} from your vault?`)) {
       return;
@@ -38,7 +41,10 @@ export default function HistoryDashboard() {
       const response = await fetch('/api/leads/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp_link: whatsappLink })
+        body: JSON.stringify({ 
+          whatsapp_link: whatsappLink,
+          user_id: user.id // 👈 3. Security: Ensures user only deletes THEIR leads
+        })
       });
       
       const result = await response.json();
