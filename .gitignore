@@ -1,1 +1,62 @@
+# ====================================================================
+# CLARION SAAS SECURITY - MASTER GITIGNORE
+# ====================================================================
+
+# 🚨 SECRETS & API KEYS (NEVER REMOVE THESE LINES)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.pub
+
+# 🐍 PYTHON / BACKEND JUNK
 .venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+htmlcov/
+.tox/
+.coverage
+.cache
+.pytest_cache/
+.mypy_cache/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 🤖 PLAYWRIGHT & SCRAPER ARTIFACTS
+.playwright/
+downloads/
+screenshots/
+videos/
+*.png
+*.jpg
+*.mp4
+
+# ⚛️ REACT / FRONTEND JUNK
+openclaw-ui/node_modules/
+openclaw-ui/dist/
+openclaw-ui/build/
+.eslintcache
+.stylelintcache
+.npm
+.yarn/
+
+# 💻 IDE & OPERATING SYSTEM FILES
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/workspace.code-workspace
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
