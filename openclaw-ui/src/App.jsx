@@ -56,7 +56,12 @@ export default function App() {
 
   // --- Actions ---
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+      setSession(null); // 👈 Forces the UI to instantly kick the user to the login screen
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   // --- UI Renders ---
