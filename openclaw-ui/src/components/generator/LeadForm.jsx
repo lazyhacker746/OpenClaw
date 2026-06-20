@@ -25,7 +25,9 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
     const loadingToast = toast.loading(`Deploying agent to ${city}...`);
 
     try {
-      const response = await fetch('/api/generate', {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      // 2. Prepend it to the fetch URL
+      const response = await fetch(`${API_BASE}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -36,7 +38,7 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
           mode: mode,
           use_ai: useAi,
           sadapay_link: sadapayLink.trim() || "none",
-          user_id: user.id // 👈 Passes the logged-in user to the Python Backend
+          user_id: user.id
         })
       });
 
