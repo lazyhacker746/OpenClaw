@@ -13,52 +13,60 @@ export default function HistoryDashboard({ user }) { // 👈 1. Added user prop
   // 1. Fetch leads from the Python API (ISOLATED TO USER)
   useEffect(() => {
     const fetchHistory = async () => {
-      if (!user) return; // Safety check
-      
-      try {
-        // 👈 2. Pass user_id to the backend so it ONLY grabs their leads
-        const response = await fetch(`/api/history?user_id=${user.id}`);
-        const result = await response.json();
-        if (result.status === 'success') {
-          setHistory(result.data);
-        }
-      } catch (error) {
-        console.error("Failed to load history:", error);
-      } finally {
-        setLoading(false);
+    if (!user) return; // Safety check
+
+    try {
+      // 1. Pull the URL from your Vercel environment
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+      // 2. Prepend it to the fetch request and pass the user ID
+      const response = await fetch(`${API_BASE}/api/history?user_id=${user.id}`);
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setHistory(result.data);
       }
-    };
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
     fetchHistory();
   }, [user]); // 👈 React will re-run this if the user changes
 
   // 2. DELETE LOGIC: Severs the magic link in Supabase securely
   const handleDelete = async (whatsappLink, businessName) => {
-    if (!window.confirm(`Are you sure you want to delete ${businessName} from your vault?`)) {
-      return;
-    }
+  if (!window.confirm(`Are you sure you want to delete ${businessName} from your vault?`)) {
+    return;
+  }
 
-    try {
-      const response = await fetch('/api/leads/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          whatsapp_link: whatsappLink,
-          user_id: user.id // 👈 3. Security: Ensures user only deletes THEIR leads
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.status === 'success') {
-        // Instantly remove it from the React UI without refreshing
-        setHistory(prev => prev.filter(lead => lead["WhatsApp Link"] !== whatsappLink));
-      } else {
-        alert("Error deleting lead from the database.");
-      }
-    } catch (error) {
-      console.error("Failed to delete lead:", error);
+  try {
+    // 1. Pull the URL from your Vercel/Local environment
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+    // 2. Prepend it to the fetch request
+    const response = await fetch(`${API_BASE}/api/leads/delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        whatsapp_link: whatsappLink,
+        user_id: user.id // Security: Ensures user only deletes THEIR leads
+      })
+    });
+
+    const result = await response.json();
+
+    if (result.status === 'success') {
+      // Instantly remove it from the React UI without refreshing
+      setHistory(prev => prev.filter(lead => lead["WhatsApp Link"] !== whatsappLink));
+    } else {
+      alert("Error deleting lead from the database.");
     }
-  };
+  } catch (error) {
+    console.error("Failed to delete lead:", error);
+  }
+};
 
   // 3. WHATSAPP URL GENERATOR: Injects the AI pitch into the chat box
   const getWhatsAppActionUrl = (baseLink, pitchText) => {
