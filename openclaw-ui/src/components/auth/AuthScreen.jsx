@@ -15,8 +15,8 @@ export default function AuthScreen() {
     e.preventDefault();
     setLoading(true);
     
-    // Clean the email string to prevent Supabase 'Invalid Email' validation errors from accidental spaces
-    const cleanEmail = email.trim(); 
+    // Clean the email string to prevent Supabase validation errors from accidental spaces
+    const cleanEmail = email.trim();
 
     try {
       if (isLogin) {
@@ -26,15 +26,23 @@ export default function AuthScreen() {
         toast.success('Welcome back to Clarion!');
       } else {
         // Attempt Registration via Supabase
-        const { error } = await supabase.auth.signUp({ email: cleanEmail, password });
+        // Notice we are extracting 'data' here now to check the session status
+        const { data, error } = await supabase.auth.signUp({ email: cleanEmail, password });
         if (error) throw error;
-        
-        toast.success("Account created! You can now sign in.");
-        setIsLogin(true); // Automatically switch them back to the login view
-        setPassword('');  // Clear the password for safety
+
+        // 🛡️ THE VERIFICATION CHECK
+        // If Supabase creates a user but returns no session, it means an email was sent.
+        if (data?.user && !data?.session) {
+          // Increase duration so they have time to read it
+          toast.success("Verification link sent! Please check your email (and spam folder) to activate your account.", { duration: 6000 });
+          setIsLogin(true);
+          setPassword(''); // Clear password for security
+        } else {
+          // Fallback just in case you ever turn email confirmation off in Supabase
+          toast.success("Account created successfully!");
+        }
       }
     } catch (error) {
-      // Automatically pop up a sleek error notification
       toast.error(error.message);
     } finally {
       setLoading(false);
