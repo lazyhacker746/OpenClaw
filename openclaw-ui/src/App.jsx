@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { Toaster } from 'react-hot-toast';
+import 'leaflet/dist/leaflet.css';
 
 // --- Organized Component Imports ---
 import AuthScreen from './components/auth/AuthScreen';
@@ -9,6 +10,7 @@ import HistoryDashboard from './components/vault/HistoryDashboard';
 import LeadForm from './components/generator/LeadForm';
 import ResultsTable from './components/generator/ResultsTable';
 import Navbar from './components/layout/Navbar';
+
 
 export default function App() {
   // --- State Management ---

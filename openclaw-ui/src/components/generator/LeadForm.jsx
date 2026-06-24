@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Search, Zap, Loader2, Crosshair, ChevronDown, MapPin, Briefcase, Target, Link } from 'lucide-react';
 import toast from 'react-hot-toast';
+import MapModal from './MapModal'; // 👈 NEW: Importing the Map Modal
 
 export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user }) {
   const [city, setCity] = useState('');
@@ -11,30 +12,46 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
   const [sadapayLink, setSadapayLink] = useState('');
   const [useAi, setUseAi] = useState(true);
 
-  // 👈 NEW: We need to store the polling interval so we can clear it if the user navigates away
+  // 👈 NEW: State for the Map Modal
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [mapData, setMapData] = useState(null); // Stores {lat, lng, radius}
+
   const pollingIntervalRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!city.trim() || !category.trim()) {
-      toast.error("Please provide both a City and Business Type.");
+    // Validate that EITHER mapData OR city text exists
+    if (!mapData && !city.trim()) {
+      toast.error("Please provide a City or select an area on the Map.");
+      return;
+    }
+
+    if (!category.trim()) {
+      toast.error("Please provide a Business Type.");
       return;
     }
 
     setIsGenerating(true);
     setLeads([]);
 
-    const loadingToastId = toast.loading(`Deploying agent to ${city}...`);
+    // Determine the location string for the toast
+    const locationDisplay = mapData ? 'selected map area' : city.trim();
+    const loadingToastId = toast.loading(`Deploying agent to ${locationDisplay}...`);
+
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+    // 👈 NEW: If mapData exists, format it as a special "coords:" string so Python knows it's a map search
+    const finalLocationPayload = mapData
+      ? `coords:${mapData.lat},${mapData.lng},${mapData.radius}`
+      : city.trim();
+
     try {
-      // 1. START THE BACKGROUND TASK
       const startResponse = await fetch(`${API_BASE}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          city: city.trim(),
+          city: finalLocationPayload, // Sends either "Lahore" OR "coords:33.77,72.75,5"
           category: category.trim(),
           target_leads: Number(targetLeads),
           min_reviews: Number(minReviews),
@@ -48,45 +65,37 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
       const startResult = await startResponse.json();
 
       if (startResult.status === 'processing' && startResult.task_id) {
-        // 2. BEGIN POLLING FOR STATUS
         const taskId = startResult.task_id;
 
-        // Check status every 3 seconds
         pollingIntervalRef.current = setInterval(async () => {
           try {
             const statusResponse = await fetch(`${API_BASE}/api/status/${taskId}`);
             const statusResult = await statusResponse.json();
 
-            // Update the toast message with live progress from Python!
             if (statusResult.progress) {
                 toast.loading(statusResult.progress, { id: loadingToastId });
             }
 
             if (statusResult.status === 'success') {
-              // SCRAPE COMPLETE!
               clearInterval(pollingIntervalRef.current);
               setIsGenerating(false);
               setLeads(statusResult.data);
               toast.success(`Acquired ${statusResult.data.length} qualified targets!`, { id: loadingToastId });
             }
             else if (statusResult.status === 'error') {
-              // SCRAPE FAILED!
               clearInterval(pollingIntervalRef.current);
               setIsGenerating(false);
               toast.error(statusResult.message?.[0] || "Scraping engine encountered an error.", { id: loadingToastId });
             }
-            // If status is 'starting' or 'processing', do nothing and check again in 3 seconds
-
           } catch (pollError) {
             console.error("Polling Error:", pollError);
             clearInterval(pollingIntervalRef.current);
             setIsGenerating(false);
             toast.error("Lost connection to the scraping engine.", { id: loadingToastId });
           }
-        }, 3000); // 3000ms = 3 seconds
+        }, 3000);
 
       } else {
-        // Failed to even start the task (e.g., validation failed)
         setIsGenerating(false);
         toast.error(startResult.message?.[0] || "Failed to start scraping engine.", { id: loadingToastId });
       }
@@ -98,7 +107,6 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
     }
   };
 
-  // 3. CLEANUP ON UNMOUNT (Important React practice to prevent memory leaks)
   React.useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
@@ -115,12 +123,43 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+
+        {/* 👈 UPDATED: City or Area input with the Map button attached */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">City or Area</label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-            <input required type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g., Lahore, Johar Town"
-              className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-2 pl-9 pr-3 text-gray-900 dark:text-white text-sm outline-none transition-colors" />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input
+                required={!mapData}
+                type="text"
+                value={mapData ? `📍 Custom Map Area (${mapData.radius}km)` : city}
+                onChange={(e) => setCity(e.target.value)}
+                readOnly={!!mapData}
+                placeholder="e.g., Lahore, Johar Town"
+                className={`w-full border focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-2 pl-9 pr-3 text-sm outline-none transition-colors ${
+                  mapData 
+                    ? 'text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-800' 
+                    : 'bg-gray-50 dark:bg-black/50 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white'
+                }`}
+              />
+              {/* Button to clear map selection and go back to text */}
+              {mapData && (
+                <button type="button" onClick={() => setMapData(null)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 text-xs font-bold transition-colors">
+                  CLEAR
+                </button>
+              )}
+            </div>
+
+            {/* The Map Trigger Button */}
+            <button
+              type="button"
+              onClick={() => setIsMapModalOpen(true)}
+              className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              <MapPin className="w-4 h-4" />
+              <span className="hidden sm:inline">Map</span>
+            </button>
           </div>
         </div>
 
@@ -184,6 +223,16 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
           {isGenerating ? <><Loader2 className="animate-spin mr-2 h-5 w-5" /> <span>Scanning Area...</span></> : <><Crosshair className="mr-2 h-5 w-5" /> <span>Start Finding Leads</span></>}
         </button>
       </form>
+
+      {/* 👈 NEW: The Map Modal Component */}
+      <MapModal
+        isOpen={isMapModalOpen}
+        onClose={() => setIsMapModalOpen(false)}
+        onConfirm={(data) => {
+          setMapData(data);
+          setIsMapModalOpen(false);
+        }}
+      />
     </div>
   );
 }
