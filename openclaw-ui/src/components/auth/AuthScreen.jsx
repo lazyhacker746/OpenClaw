@@ -126,8 +126,7 @@ export default function AuthScreen() {
             <form onSubmit={handleVerifyOtp} className="space-y-5">
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold uppercase tracking-wide text-gray-400">6-Digit Code</label>
-                  {/* 👈 THE EXPIRATION TIMER */}
+                  <label className="text-xs font-bold uppercase tracking-wide text-gray-400">8-Digit Code</label>
                   <span className={`text-xs font-mono font-bold ${timeLeft < 60 ? 'text-red-400' : 'text-gray-400'}`}>
                     Expires in: {formattedTime}
                   </span>
@@ -135,14 +134,14 @@ export default function AuthScreen() {
                 
                 <div className="relative">
                   <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="text" required maxLength="6" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} // Forces numbers only
+                  <input type="text" required maxLength="8" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} 
                     disabled={timeLeft === 0}
                     className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-3 pl-10 pr-4 text-white text-center tracking-[0.5em] font-bold text-xl outline-none transition-colors disabled:opacity-50"
-                    placeholder="••••••" />
+                    placeholder="••••••••" />
                 </div>
               </div>
 
-              <button type="submit" disabled={loading || timeLeft === 0} 
+              <button type="submit" disabled={loading || timeLeft === 0 || otp.length < 8} 
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Confirm Registration</span>}
               </button>
