@@ -137,7 +137,7 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
                 onChange={(e) => setCity(e.target.value)}
                 readOnly={!!mapData}
                 placeholder="e.g., Lahore, Johar Town"
-                className={`w-full border focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-2 pl-9 pr-3 text-sm outline-none transition-colors ${
+                className={`w-full border focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-2 pl-9 pr-14 text-sm outline-none transition-colors ${
                   mapData 
                     ? 'text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-800' 
                     : 'bg-gray-50 dark:bg-black/50 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white'
