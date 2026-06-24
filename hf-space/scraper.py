@@ -13,7 +13,33 @@ def format_whatsapp_link(phone_raw):
 
 
 def run_scraper(data):
-    search_query = f"{data['category']} in {data['city']}"
+    # --- 📍 NEW URL INTERCEPTOR LOGIC ---
+    category = data['category']
+    raw_city = data['city']
+
+    if raw_city.startswith("coords:"):
+        # It's a map search! Extract the GPS data
+        parts = raw_city.replace("coords:", "").split(",")
+        lat, lng = parts[0], parts[1]
+        radius = float(parts[2]) if len(parts) > 2 else 5
+
+        # Calculate a Google Maps zoom level based on the radius (km)
+        if radius <= 2: zoom = 14
+        elif radius <= 5: zoom = 13
+        elif radius <= 15: zoom = 12
+        else: zoom = 11
+
+        search_query = category
+        maps_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}/@{lat},{lng},{zoom}z"
+        print(f"\n📍 GPS MAP SEARCH: Targeting '{category}' near {lat}, {lng} ({radius}km radius)")
+
+    else:
+        # It's a standard text search!
+        search_query = f"{category} in {raw_city}"
+        maps_url = f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}"
+        print(f"\n📝 TEXT SEARCH: '{search_query}'")
+    # ------------------------------------
+
     scraped_data = []
     processed_urls = set()
 
@@ -21,8 +47,8 @@ def run_scraper(data):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        print(f"\n🔍 Searching Google Maps for '{search_query}'...")
-        page.goto(f"https://www.google.com/maps/search/{search_query.replace(' ', '+')}")
+        # 👈 Inject the dynamic URL we built above
+        page.goto(maps_url)
         time.sleep(5)
 
         no_new_data_counter = 0
