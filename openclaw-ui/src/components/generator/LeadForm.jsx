@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Zap, Loader2, Crosshair, ChevronDown, MapPin, Briefcase, Target, Link } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -7,9 +7,12 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
   const [category, setCategory] = useState('');
   const [targetLeads, setTargetLeads] = useState(5);
   const [minReviews, setMinReviews] = useState(10);
-  const [mode, setMode] = useState('1'); 
+  const [mode, setMode] = useState('1');
   const [sadapayLink, setSadapayLink] = useState('');
   const [useAi, setUseAi] = useState(true);
+
+  // 👈 NEW: We need to store the polling interval so we can clear it if the user navigates away
+  const pollingIntervalRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,14 +23,14 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
     }
 
     setIsGenerating(true);
-    setLeads([]); 
+    setLeads([]);
 
-    const loadingToast = toast.loading(`Deploying agent to ${city}...`);
+    const loadingToastId = toast.loading(`Deploying agent to ${city}...`);
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      // 2. Prepend it to the fetch URL
-      const response = await fetch(`${API_BASE}/api/generate`, {
+      // 1. START THE BACKGROUND TASK
+      const startResponse = await fetch(`${API_BASE}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,21 +45,67 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
         })
       });
 
-      const result = await response.json();
+      const startResult = await startResponse.json();
 
-      if (result.status === 'success') {
-        setLeads(result.data);
-        toast.success(`Acquired ${result.data.length} qualified targets!`, { id: loadingToast });
+      if (startResult.status === 'processing' && startResult.task_id) {
+        // 2. BEGIN POLLING FOR STATUS
+        const taskId = startResult.task_id;
+
+        // Check status every 3 seconds
+        pollingIntervalRef.current = setInterval(async () => {
+          try {
+            const statusResponse = await fetch(`${API_BASE}/api/status/${taskId}`);
+            const statusResult = await statusResponse.json();
+
+            // Update the toast message with live progress from Python!
+            if (statusResult.progress) {
+                toast.loading(statusResult.progress, { id: loadingToastId });
+            }
+
+            if (statusResult.status === 'success') {
+              // SCRAPE COMPLETE!
+              clearInterval(pollingIntervalRef.current);
+              setIsGenerating(false);
+              setLeads(statusResult.data);
+              toast.success(`Acquired ${statusResult.data.length} qualified targets!`, { id: loadingToastId });
+            }
+            else if (statusResult.status === 'error') {
+              // SCRAPE FAILED!
+              clearInterval(pollingIntervalRef.current);
+              setIsGenerating(false);
+              toast.error(statusResult.message?.[0] || "Scraping engine encountered an error.", { id: loadingToastId });
+            }
+            // If status is 'starting' or 'processing', do nothing and check again in 3 seconds
+
+          } catch (pollError) {
+            console.error("Polling Error:", pollError);
+            clearInterval(pollingIntervalRef.current);
+            setIsGenerating(false);
+            toast.error("Lost connection to the scraping engine.", { id: loadingToastId });
+          }
+        }, 3000); // 3000ms = 3 seconds
+
       } else {
-        toast.error(result.message?.[0] || "No leads found. Try expanding your search.", { id: loadingToast });
+        // Failed to even start the task (e.g., validation failed)
+        setIsGenerating(false);
+        toast.error(startResult.message?.[0] || "Failed to start scraping engine.", { id: loadingToastId });
       }
+
     } catch (error) {
       console.error("Generator Error:", error);
-      toast.error("System failed to connect to the scraping engine.", { id: loadingToast });
-    } finally {
       setIsGenerating(false);
+      toast.error("System failed to connect to the backend API.", { id: loadingToastId });
     }
   };
+
+  // 3. CLEANUP ON UNMOUNT (Important React practice to prevent memory leaks)
+  React.useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="bg-white/80 dark:bg-gray-900/50 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl transition-colors duration-300">

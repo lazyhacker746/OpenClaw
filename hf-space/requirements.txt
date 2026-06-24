@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+supabase
+python-dotenv
+playwright==1.44.0
+openai==2.36.0
+numpy==2.4.4
+pandas
+pandas-stubs==3.0.3.260530
+pydantic==2.13.4
+requests==2.34.0
+tqdm==4.67.3
