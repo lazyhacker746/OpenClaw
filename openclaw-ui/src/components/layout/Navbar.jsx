@@ -1,15 +1,13 @@
-// Navbar.jsx
 import React, { useEffect, useState } from 'react';
 import { Sun, Moon, Search, Users, Menu, X, LogOut } from 'lucide-react';
 
 export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const userLabel =
-    user?.email ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.username ||
-    'Signed in';
+  // 1. Prioritize the full name, split it to get the first name, fallback to email
+  const fullName = user?.user_metadata?.full_name;
+  const firstName = fullName ? fullName.split(' ')[0] : null;
+  const fallbackEmail = user?.email || 'Signed in';
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -26,17 +24,26 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
   return (
     <nav className="relative z-10 border-b border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/50 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
+
+        {/* DESKTOP LOGO & GREETING */}
         <div className="flex items-center">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 uppercase">
+            <h1 className="text-xl sm:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 uppercase mb-1">
               Clarion
             </h1>
-            <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {userLabel}
-            </p>
+            {firstName ? (
+              <span className="hidden sm:inline-flex text-xs text-purple-400 font-medium bg-purple-900/30 px-2 py-0.5 rounded items-center gap-1 shadow-sm border border-purple-500/20">
+                👋 Welcome back, {firstName}
+              </span>
+            ) : (
+              <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400">
+                {fallbackEmail}
+              </p>
+            )}
           </div>
         </div>
 
+        {/* DESKTOP TABS & ICONS */}
         <div className="flex items-center space-x-3">
           <button
             onClick={toggleTheme}
@@ -79,6 +86,7 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
             <span>Disconnect</span>
           </button>
 
+          {/* MOBILE MENU TOGGLE */}
           <button
             onClick={() => setIsMobileMenuOpen(true)}
             className="md:hidden p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
@@ -89,6 +97,7 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
         </div>
       </div>
 
+      {/* MOBILE MENU MODAL */}
       {isMobileMenuOpen && (
         <>
           <div
@@ -100,11 +109,19 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
             <div>
               <div className="p-5 flex items-center justify-between border-b border-white/10">
                 <div>
-                  <span className="text-lg font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 uppercase">
+                  <span className="text-lg font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-blue-500 uppercase block mb-1">
                     Clarion
                   </span>
-                  <div className="mt-1 text-xs text-gray-400">
-                    {userLabel}
+
+                  {/* MOBILE LOGO & GREETING */}
+                  <div>
+                    {firstName ? (
+                      <span className="text-xs text-purple-400 font-medium bg-purple-900/30 px-2 py-0.5 rounded inline-flex items-center gap-1 shadow-sm border border-purple-500/20">
+                        👋 Welcome, {firstName}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">{fallbackEmail}</span>
+                    )}
                   </div>
                 </div>
                 <button
