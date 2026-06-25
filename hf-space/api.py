@@ -12,7 +12,7 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_lead
+from database import save_leads_to_db, get_user_vault, delete_user_leads
 
 app = FastAPI(title="Clarion API", version="2.0")
 
