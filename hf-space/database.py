@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from typing import List
 
 load_dotenv()
 
@@ -97,22 +98,35 @@ def get_user_vault(user_id: str):
         return []
 
 
-def delete_user_lead(user_id: str, whatsapp_link: str):
-    """Severs the link between a user and a lead."""
+def delete_user_leads(user_id: str, whatsapp_links: List[str]):
+    """
+    BULK DELETE: Severs the link between a user and multiple leads efficiently.
+    """
     try:
-        lead_response = supabase.table('master_leads').select('id').eq('whatsapp_link', whatsapp_link).execute()
+        # Step 1: Look up all global Lead IDs matching the array of WhatsApp links
+        # Using .in_() is much faster than looping!
+        lead_response = supabase.table('master_leads').select('id').in_('whatsapp_link', whatsapp_links).execute()
 
         if not lead_response.data:
-            return False
+            print("[-] Delete Error: None of those WhatsApp links were found in master_leads.")
+            return False, 0
 
-        lead_id = lead_response.data[0]['id']
+        # Extract just the ID numbers into a list: [14, 25, 88]
+        lead_ids = [item['id'] for item in lead_response.data]
 
-        supabase.table('user_unlocked_leads') \
+        # Step 2: Delete all mapping links for this user that match those IDs
+        delete_response = supabase.table('user_unlocked_leads') \
             .delete() \
-            .match({'user_id': user_id, 'lead_id': lead_id}) \
+            .eq('user_id', user_id) \
+            .in_('lead_id', lead_ids) \
             .execute()
 
-        return True
+        # Optional: Check how many were actually deleted
+        deleted_count = len(delete_response.data) if delete_response.data else len(lead_ids)
+        print(f"[+] Bulk Delete Success: Removed {deleted_count} links from user vault.")
+
+        return True, deleted_count
+
     except Exception as e:
-        print(f"[-] Delete Lead Error: {e}")
-        return False
+        print(f"[-] Bulk Delete Error: {e}")
+        return False, 0

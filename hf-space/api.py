@@ -5,6 +5,7 @@ from fastapi import FastAPI, BackgroundTasks  # 👈 NEW: BackgroundTasks import
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pandas as pd
+from typing import List
 
 # YOUR modular imports remain intact
 from validators import validate_inputs
@@ -39,9 +40,8 @@ class LeadRequest(BaseModel):
 
 
 class DeleteRequest(BaseModel):
-    whatsapp_link: str
+    whatsapp_links: List[str] # 👈 Changed from string to list
     user_id: str
-
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -126,14 +126,19 @@ def get_status(task_id: str):
 
 
 # --- EXISTING ENDPOINTS (Untouched) ---
-@app.post("/api/leads/delete")
-def delete_lead(request: DeleteRequest):
-    print(f"[!] User {request.user_id} is deleting lead: {request.whatsapp_link}")
-    success = delete_user_lead(request.user_id, request.whatsapp_link)
+@app.post("/api/leads/bulk-delete")  # 👈 New Route Name
+def bulk_delete_leads(request: DeleteRequest):
+    print(f"\n[!] User {request.user_id} requested BULK DELETE for {len(request.whatsapp_links)} leads.")
+
+    if not request.whatsapp_links:
+        return {"status": "error", "message": "No leads selected for deletion."}
+
+    success, deleted_count = delete_user_leads(request.user_id, request.whatsapp_links)
+
     if success:
-        return {"status": "success", "message": "Lead permanently removed from vault."}
+        return {"status": "success", "message": f"Successfully removed {deleted_count} leads from vault."}
     else:
-        return {"status": "error", "message": "Failed to delete lead from database."}
+        return {"status": "error", "message": "Failed to delete leads from database."}
 
 
 @app.get("/api/history")
