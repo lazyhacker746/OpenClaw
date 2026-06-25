@@ -80,6 +80,24 @@ export default function MapModal({ isOpen, onClose, onConfirm }) {
     }
   };
 
+  const handleConfirmClick = async () => {
+    const loadingToast = toast.loading("Resolving area coordinates...");
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position[0]}&lon=${position[1]}`);
+      const data = await response.json();
+
+      // Extract the most accurate city/town name
+      const address = data.address || {};
+      const resolvedCity = address.city || address.town || address.village || address.county || "Custom Map Area";
+
+      toast.dismiss(loadingToast);
+      onConfirm({ lat: position[0], lng: position[1], radius, resolvedCity });
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      onConfirm({ lat: position[0], lng: position[1], radius, resolvedCity: "Custom Map Area" });
+    }
+  };
+
   if (!isOpen) return null;
 
   // 2. THE PORTAL: Injects this HTML directly into the body tag so it covers the whole screen
@@ -170,7 +188,7 @@ export default function MapModal({ isOpen, onClose, onConfirm }) {
           </div>
 
           <button
-            onClick={() => onConfirm({ lat: position[0], lng: position[1], radius })}
+            onClick={handleConfirmClick} // 👈 Using the new async function
             className="w-full sm:w-auto px-10 bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] whitespace-nowrap text-lg"
           >
             Confirm Area

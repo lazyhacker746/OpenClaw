@@ -120,6 +120,7 @@ export default function App() {
           setActiveTab={setActiveTab}
           onLogout={handleLogout}
           user={session?.user}
+          isGenerating={isGenerating}
         />
       </header>
 

@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, Zap, Loader2, Crosshair, ChevronDown, MapPin, Briefcase, Target, Link } from 'lucide-react';
 import toast from 'react-hot-toast';
-import MapModal from './MapModal'; // 👈 NEW: Importing the Map Modal
+import MapModal from './MapModal';
 
 export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user }) {
   const [city, setCity] = useState('');
@@ -12,21 +12,50 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
   const [sadapayLink, setSadapayLink] = useState('');
   const [useAi, setUseAi] = useState(true);
 
-  // 👈 NEW: State for the Map Modal
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-  const [mapData, setMapData] = useState(null); // Stores {lat, lng, radius}
-
+  const [mapData, setMapData] = useState(null);
   const pollingIntervalRef = useRef(null);
+
+  // 👈 NEW: Autocomplete State for the Main Form
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [isSearchingCity, setIsSearchingCity] = useState(false);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+
+  // 👈 NEW: Debouncer to fetch city suggestions as the user types
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (city.length > 2 && !mapData) {
+        setIsSearchingCity(true);
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(city)}&limit=5`);
+          const data = await response.json();
+          setCitySuggestions(data);
+          setShowCitySuggestions(true);
+        } catch (error) {
+          console.error("Geocoding failed:", error);
+        } finally {
+          setIsSearchingCity(false);
+        }
+      } else {
+        setCitySuggestions([]);
+        setShowCitySuggestions(false);
+      }
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [city, mapData]);
+
+  const handleSelectCity = (cityName) => {
+    setCity(cityName.split(',')[0]); // Only take the main city name
+    setShowCitySuggestions(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate that EITHER mapData OR city text exists
     if (!mapData && !city.trim()) {
       toast.error("Please provide a City or select an area on the Map.");
       return;
     }
-
     if (!category.trim()) {
       toast.error("Please provide a Business Type.");
       return;
@@ -35,15 +64,14 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
     setIsGenerating(true);
     setLeads([]);
 
-    // Determine the location string for the toast
-    const locationDisplay = mapData ? 'selected map area' : city.trim();
+    const locationDisplay = mapData ? mapData.resolvedCity : city.trim();
     const loadingToastId = toast.loading(`Deploying agent to ${locationDisplay}...`);
 
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-    // 👈 NEW: If mapData exists, format it as a special "coords:" string so Python knows it's a map search
+    // 👈 NEW: Safely append the resolved city name to the 4th slot of the coords string!
     const finalLocationPayload = mapData
-      ? `coords:${mapData.lat},${mapData.lng},${mapData.radius}`
+      ? `coords:${mapData.lat},${mapData.lng},${mapData.radius},${mapData.resolvedCity}`
       : city.trim();
 
     try {
@@ -51,7 +79,7 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          city: finalLocationPayload, // Sends either "Lahore" OR "coords:33.77,72.75,5"
+          city: finalLocationPayload,
           category: category.trim(),
           target_leads: Number(targetLeads),
           min_reviews: Number(minReviews),
@@ -107,11 +135,9 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };
   }, []);
 
@@ -124,7 +150,6 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
 
       <form onSubmit={handleSubmit} className="space-y-5">
 
-        {/* 👈 UPDATED: City or Area input with the Map button attached */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">City or Area</label>
           <div className="flex gap-2">
@@ -133,8 +158,11 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
               <input
                 required={!mapData}
                 type="text"
-                value={mapData ? `📍 Custom Map Area (${mapData.radius}km)` : city}
-                onChange={(e) => setCity(e.target.value)}
+                value={mapData ? `📍 ${mapData.resolvedCity} (${mapData.radius}km)` : city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  if (mapData) setMapData(null); // Auto-clear map if user starts typing
+                }}
                 readOnly={!!mapData}
                 placeholder="e.g., Lahore, Johar Town"
                 className={`w-full border focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-2 pl-9 pr-14 text-sm outline-none transition-colors ${
@@ -143,7 +171,23 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
                     : 'bg-gray-50 dark:bg-black/50 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white'
                 }`}
               />
-              {/* Button to clear map selection and go back to text */}
+
+              {/* 👈 NEW: Autocomplete Dropdown for Main Form */}
+              {showCitySuggestions && citySuggestions.length > 0 && !mapData && (
+                <ul className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-[#111827] border border-gray-200 dark:border-gray-700 rounded-lg shadow-2xl overflow-hidden z-[100]">
+                  {citySuggestions.map((item, index) => (
+                    <li
+                      key={index}
+                      onClick={() => handleSelectCity(item.display_name)}
+                      className="px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-600/20 cursor-pointer flex items-start gap-3 border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
+                    >
+                      <MapPin className="w-4 h-4 text-purple-500 dark:text-purple-400 mt-0.5 shrink-0" />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{item.display_name}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               {mapData && (
                 <button type="button" onClick={() => setMapData(null)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500 text-xs font-bold transition-colors">
                   CLEAR
@@ -151,7 +195,6 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
               )}
             </div>
 
-            {/* The Map Trigger Button */}
             <button
               type="button"
               onClick={() => setIsMapModalOpen(true)}
@@ -163,6 +206,7 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
           </div>
         </div>
 
+        {/* --- REST OF THE FORM (Unchanged) --- */}
         <div>
           <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Type of Business</label>
           <div className="relative">
@@ -224,7 +268,6 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
         </button>
       </form>
 
-      {/* 👈 NEW: The Map Modal Component */}
       <MapModal
         isOpen={isMapModalOpen}
         onClose={() => setIsMapModalOpen(false)}
