@@ -1,23 +1,89 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Download, Clock, Loader2, MessageCircle, Filter, ChevronDown, Trash2, Calendar, CheckSquare, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Users, Download, Clock, Loader2, MessageCircle, Filter, ChevronDown, Trash2, Calendar, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+// 🛠️ DEV FIX 1: Premium Custom Checkbox
+const CustomCheckbox = ({ checked, onChange }) => (
+  <div
+    onClick={onChange}
+    className={`w-4 h-4 rounded border flex items-center justify-center cursor-pointer transition-all duration-200 ${
+      checked 
+        ? 'bg-purple-600 border-purple-600' 
+        : 'bg-black/40 border-gray-600 hover:border-purple-500'
+    }`}
+  >
+    {checked && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+  </div>
+);
+
+// 🛠️ DEV FIX 2: Premium Custom Dropdown (Bypasses OS styling)
+const CustomDropdown = ({ value, options, onChange, icon: Icon, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown if clicked outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative flex-1 sm:flex-none" ref={dropdownRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between space-x-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 hover:border-purple-500 dark:hover:border-purple-500 rounded-lg px-3 py-2 cursor-pointer transition-colors w-full min-w-[140px]"
+      >
+        <div className="flex items-center space-x-2">
+          {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">
+            {value === 'All' ? placeholder : value}
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-[#0B0F19] border border-gray-200 dark:border-gray-800 rounded-lg shadow-2xl z-50 overflow-hidden py-1 max-h-60 overflow-y-auto custom-scrollbar">
+          {options.map((option) => (
+            <div
+              key={option}
+              onClick={() => {
+                onChange(option);
+                setIsOpen(false);
+              }}
+              className={`px-4 py-2 text-sm cursor-pointer transition-colors ${
+                value === option 
+                  ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 font-bold' 
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
+              }`}
+            >
+              {option === 'All' ? placeholder : option}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function HistoryDashboard({ user }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Filter States
   const [filterCity, setFilterCity] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterDate, setFilterDate] = useState('');
 
-  // Bulk Delete States
-  const [selectedLeads, setSelectedLeads] = useState([]); // Array of WhatsApp Links
+  const [selectedLeads, setSelectedLeads] = useState([]);
 
-  // Custom Modal States
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [leadToDelete, setLeadToDelete] = useState(null); // { name, link } for single delete
-  const [isDeleting, setIsDeleting] = useState(false); // To show spinner on the delete button
+  const [leadToDelete, setLeadToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -38,12 +104,10 @@ export default function HistoryDashboard({ user }) {
     fetchHistory();
   }, [user]);
 
-  // If filters change, clear the selection to prevent accidental hidden deletions (QA Check!)
   useEffect(() => {
     setSelectedLeads([]);
   }, [filterCity, filterCategory, filterDate]);
 
-  // Filtering Logic
   const uniqueCities = useMemo(() => ['All', ...new Set(history.map(item => item.city || item.City))], [history]);
   const uniqueCategories = useMemo(() => ['All', ...new Set(history.map(item => item.category || item.Category))], [history]);
 
@@ -56,12 +120,11 @@ export default function HistoryDashboard({ user }) {
     });
   }, [history, filterCity, filterCategory, filterDate]);
 
-  // Checkbox Handlers
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      setSelectedLeads(filteredHistory.map(lead => lead["WhatsApp Link"]));
+  const handleSelectAll = () => {
+    if (selectedLeads.length === filteredHistory.length && filteredHistory.length > 0) {
+      setSelectedLeads([]); // Deselect all
     } else {
-      setSelectedLeads([]);
+      setSelectedLeads(filteredHistory.map(lead => lead["WhatsApp Link"])); // Select all
     }
   };
 
@@ -73,27 +136,23 @@ export default function HistoryDashboard({ user }) {
     );
   };
 
-  // --- DELETE LOGIC ---
   const triggerSingleDelete = (whatsappLink, businessName) => {
     setLeadToDelete({ name: businessName, link: whatsappLink });
     setIsDeleteModalOpen(true);
   };
 
   const triggerBulkDelete = () => {
-    setLeadToDelete(null); // Null means it's a bulk operation
+    setLeadToDelete(null);
     setIsDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
     setIsDeleting(true);
     const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
-    // Determine if we are deleting one or many
     const isBulk = leadToDelete === null;
     const linksToDelete = isBulk ? selectedLeads : [leadToDelete.link];
 
     try {
-      // We will create this new bulk route in the backend next!
       const response = await fetch(`${API_BASE}/api/leads/bulk-delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,7 +215,6 @@ export default function HistoryDashboard({ user }) {
 
         {/* FILTERS */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          {/* Action Button: Replaces Export when leads are selected */}
           {selectedLeads.length > 0 ? (
             <button
               onClick={triggerBulkDelete}
@@ -167,26 +225,33 @@ export default function HistoryDashboard({ user }) {
             </button>
           ) : (
             <>
-              {/* Standard Filters (Hide on mobile when selecting to save space, visible otherwise) */}
-              <div className="relative flex items-center space-x-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 flex-1 sm:flex-none">
-                <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-                <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} className="bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-300 outline-none w-full cursor-pointer appearance-none pr-6 z-10">
-                  {uniqueCities.map(city => <option key={city} value={city}>{city === 'All' ? 'All Cities' : city}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3 w-4 h-4 text-gray-500 pointer-events-none" />
-              </div>
-              <div className="relative flex items-center space-x-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 flex-1 sm:flex-none">
-                <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-                <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-300 outline-none w-full cursor-pointer appearance-none pr-6 z-10">
-                  {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat === 'All' ? 'All Types' : cat}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3 w-4 h-4 text-gray-500 pointer-events-none" />
-              </div>
-              <div className="relative flex items-center space-x-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-1.5 flex-1 sm:flex-none">
+              {/* 👈 APPLIED DEV FIX 2: Custom Dropdowns */}
+              <CustomDropdown
+                value={filterCity}
+                options={uniqueCities}
+                onChange={setFilterCity}
+                icon={Filter}
+                placeholder="All Cities"
+              />
+              <CustomDropdown
+                value={filterCategory}
+                options={uniqueCategories}
+                onChange={setFilterCategory}
+                icon={Filter}
+                placeholder="All Types"
+              />
+
+              <div className="relative flex items-center space-x-2 bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 flex-1 sm:flex-none hover:border-purple-500 dark:hover:border-purple-500 transition-colors">
                 <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
-                <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-300 outline-none w-full cursor-pointer appearance-none" />
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-300 outline-none w-full cursor-pointer appearance-none"
+                />
                 {filterDate && <button onClick={() => setFilterDate('')} className="text-xs text-red-500 font-bold ml-2 hover:underline shrink-0">Clear</button>}
               </div>
+
               <button onClick={exportAllCSV} className="flex items-center justify-center space-x-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-700 px-4 py-2 rounded-lg text-sm font-bold text-purple-700 dark:text-purple-400 transition-colors w-full sm:w-auto">
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Export</span>
@@ -209,12 +274,12 @@ export default function HistoryDashboard({ user }) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+
           {/* MOBILE VIEW */}
           <div className="block md:hidden divide-y divide-gray-200 dark:divide-gray-800/50 max-h-[500px] overflow-y-auto custom-scrollbar">
             <div className="p-3 bg-gray-100 dark:bg-black/80 flex items-center gap-3">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600 cursor-pointer"
+              {/* 👈 APPLIED DEV FIX 1: Custom Checkbox */}
+              <CustomCheckbox
                 checked={selectedLeads.length === filteredHistory.length && filteredHistory.length > 0}
                 onChange={handleSelectAll}
               />
@@ -223,12 +288,12 @@ export default function HistoryDashboard({ user }) {
             {filteredHistory.map((lead, idx) => (
               <div key={idx} className={`p-4 transition-colors ${selectedLeads.includes(lead["WhatsApp Link"]) ? 'bg-purple-50 dark:bg-purple-900/20' : 'bg-white dark:bg-black/20'} space-y-3`}>
                 <div className="flex gap-3 items-start">
-                  <input
-                    type="checkbox"
-                    className="mt-1 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600 cursor-pointer"
-                    checked={selectedLeads.includes(lead["WhatsApp Link"])}
-                    onChange={() => handleSelectOne(lead["WhatsApp Link"])}
-                  />
+                  <div className="mt-1">
+                    <CustomCheckbox
+                      checked={selectedLeads.includes(lead["WhatsApp Link"])}
+                      onChange={() => handleSelectOne(lead["WhatsApp Link"])}
+                    />
+                  </div>
                   <div className="flex-1">
                     <div className="text-xs font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">
                       {lead.Category || lead.category} <span className="text-gray-400 mx-1">•</span> {lead.City || lead.city}
@@ -242,10 +307,7 @@ export default function HistoryDashboard({ user }) {
                       <span>{lead.date_scraped || "Recent"}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => triggerSingleDelete(lead["WhatsApp Link"], lead["Business Name"])}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                      >
+                      <button onClick={() => triggerSingleDelete(lead["WhatsApp Link"], lead["Business Name"])} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                       <a href={getWhatsAppActionUrl(lead["WhatsApp Link"], lead["Pitch"])} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm text-xs">
@@ -264,12 +326,12 @@ export default function HistoryDashboard({ user }) {
               <thead className="text-xs uppercase bg-gray-100 dark:bg-black/80 text-purple-700 dark:text-purple-400/80 font-bold sticky top-0 z-10 shadow-sm backdrop-blur-md">
                 <tr>
                   <th className="px-5 py-4 w-12 text-center">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600 cursor-pointer"
-                      checked={selectedLeads.length === filteredHistory.length && filteredHistory.length > 0}
-                      onChange={handleSelectAll}
-                    />
+                    <div className="flex justify-center">
+                      <CustomCheckbox
+                        checked={selectedLeads.length === filteredHistory.length && filteredHistory.length > 0}
+                        onChange={handleSelectAll}
+                      />
+                    </div>
                   </th>
                   <th className="px-5 py-4">Date Acquired</th>
                   <th className="px-5 py-4">Targeting</th>
@@ -282,13 +344,13 @@ export default function HistoryDashboard({ user }) {
                   const isSelected = selectedLeads.includes(lead["WhatsApp Link"]);
                   return (
                     <tr key={idx} className={`transition-colors ${isSelected ? 'bg-purple-50 dark:bg-purple-900/20' : 'bg-white dark:bg-black/20 hover:bg-gray-50 dark:hover:bg-gray-900/40'}`}>
-                      <td className="px-5 py-4 text-center">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600 cursor-pointer"
-                          checked={isSelected}
-                          onChange={() => handleSelectOne(lead["WhatsApp Link"])}
-                        />
+                      <td className="px-5 py-4">
+                        <div className="flex justify-center">
+                          <CustomCheckbox
+                            checked={isSelected}
+                            onChange={() => handleSelectOne(lead["WhatsApp Link"])}
+                          />
+                        </div>
                       </td>
                       <td className="px-5 py-4 font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         <div className="flex items-center space-x-1.5"><Clock className="w-3 h-3" /><span>{lead.date_scraped || "Recent"}</span></div>
@@ -358,7 +420,6 @@ export default function HistoryDashboard({ user }) {
           </div>
         </div>
       )}
-
     </div>
   );
 }
