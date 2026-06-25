@@ -353,6 +353,13 @@ export default function HistoryDashboard({ user }) {
                       <span>{lead.date_scraped || "Recent"}</span>
                     </div>
                     <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => openInsights(lead)}
+                        className="inline-flex items-center space-x-1 bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm text-xs"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Insights</span>
+                      </button>
                       <button onClick={() => triggerSingleDelete(lead["WhatsApp Link"], lead["Business Name"])} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
