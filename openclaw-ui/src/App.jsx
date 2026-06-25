@@ -1,5 +1,4 @@
-// App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
 import { Toaster } from 'react-hot-toast';
 import 'leaflet/dist/leaflet.css';
@@ -16,20 +15,25 @@ export default function App() {
   // --- State Management ---
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('generator'); // Navigation state
+  const [activeTab, setActiveTab] = useState('generator');
 
-  // Theme state (default to dark look)
+  // Theme state
   const [isDark, setIsDark] = useState(true);
 
-  // Generator specific state (lifted up so Form and Table can share it)
+  // Generator specific state
   const [leads, setLeads] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // 👈 NEW: Global Vault State (Persists across tab changes)
+  const [vaultHistory, setVaultHistory] = useState([]);
+  const [isVaultLoaded, setIsVaultLoaded] = useState(false);
+  const [isVaultLoading, setIsVaultLoading] = useState(false);
 
   // --- Theme Initialization ---
   useEffect(() => {
     const stored = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialDark = stored ? stored === 'dark' : true; // default dark look
+    const initialDark = stored ? stored === 'dark' : true;
     setIsDark(initialDark ?? prefersDark);
   }, []);
 
@@ -42,13 +46,11 @@ export default function App() {
 
   // --- Authentication Listeners ---
   useEffect(() => {
-    // 1. Check current session on initial load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoadingAuth(false);
     });
 
-    // 2. Listen for any login/logout events in the background
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -56,19 +58,51 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 👈 NEW: Global Fetch Function for the Vault
+  const fetchVaultHistory = useCallback(async (forceRefresh = false) => {
+    // If it's already loaded and we aren't forcing a refresh, skip the network request!
+    if (isVaultLoaded && !forceRefresh) return;
+    if (!session?.user) return;
+
+    setIsVaultLoading(true);
+
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/history?user_id=${session.user.id}`);
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        setVaultHistory(result.data);
+        setIsVaultLoaded(true);
+      }
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    } finally {
+      setIsVaultLoading(false);
+    }
+  }, [isVaultLoaded, session?.user]);
+
+  // 👈 NEW: Fetch vault data once the user is authenticated
+  useEffect(() => {
+    if (session?.user) {
+      fetchVaultHistory();
+    }
+  }, [session?.user, fetchVaultHistory]);
+
   // --- Actions ---
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      setSession(null); // 👈 Forces the UI to instantly kick the user to the login screen
+      setSession(null);
+      // Clean up cache on logout
+      setVaultHistory([]);
+      setIsVaultLoaded(false);
     } catch (error) {
       console.error("Logout Error:", error);
     }
   };
 
   // --- UI Renders ---
-
-  // 1. Loading State (Checking Database)
   if (loadingAuth) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] flex items-center justify-center text-purple-500 font-bold tracking-widest uppercase">
@@ -77,7 +111,6 @@ export default function App() {
     );
   }
 
-  // 2. The Bouncer (Not Logged In)
   if (!session) {
     return (
       <>
@@ -96,10 +129,8 @@ export default function App() {
     );
   }
 
-  // 3. The Main Application (Logged In)
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-gray-900 dark:text-gray-200 font-sans selection:bg-purple-500/30">
-      {/* Global Notifications Controller */}
       <Toaster
         position="top-center"
         toastOptions={{
@@ -111,7 +142,6 @@ export default function App() {
         }}
       />
 
-      {/* Global Header / Navbar */}
       <header className="sticky top-0 z-50">
         <Navbar
           isDark={isDark}
@@ -124,27 +154,32 @@ export default function App() {
         />
       </header>
 
-      {/* Main Content Router */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'generator' ? (
           <div className="flex flex-col md:flex-row gap-8">
             <div className="w-full md:w-1/3">
-              <LeadForm 
-                setLeads={setLeads} 
-                setIsGenerating={setIsGenerating} 
-                isGenerating={isGenerating} 
-                user={session.user} 
+              <LeadForm
+                setLeads={setLeads}
+                setIsGenerating={setIsGenerating}
+                isGenerating={isGenerating}
+                user={session.user}
+                onScrapeComplete={() => fetchVaultHistory(true)} // 👈 NEW: Triggers background refresh!
               />
             </div>
             <div className="w-full md:w-2/3">
-              <ResultsTable 
-                leads={leads} 
-                isGenerating={isGenerating} 
+              <ResultsTable
+                leads={leads}
+                isGenerating={isGenerating}
               />
             </div>
           </div>
         ) : (
-          <HistoryDashboard user={session.user} />
+          <HistoryDashboard
+            user={session.user}
+            history={vaultHistory}        // 👈 NEW: Pass cached data down
+            setHistory={setVaultHistory}  // 👈 NEW: Let Vault modify cache (for deletes/edits)
+            loading={isVaultLoading}      // 👈 NEW: Pass loading state
+          />
         )}
       </main>
     </div>

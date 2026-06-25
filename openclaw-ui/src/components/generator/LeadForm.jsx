@@ -3,7 +3,7 @@ import { Search, Zap, Loader2, Crosshair, ChevronDown, MapPin, Briefcase, Target
 import toast from 'react-hot-toast';
 import MapModal from './MapModal';
 
-export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user }) {
+export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user, onScrapeComplete }) {
   const [city, setCity] = useState('');
   const [category, setCategory] = useState('');
   const [targetLeads, setTargetLeads] = useState(5);
@@ -109,6 +109,11 @@ export default function LeadForm({ setLeads, setIsGenerating, isGenerating, user
               setIsGenerating(false);
               setLeads(statusResult.data);
               toast.success(`Acquired ${statusResult.data.length} qualified targets!`, { id: loadingToastId });
+
+              // 👈 NEW: Tell App.jsx to quietly fetch the newest leads!
+              if (onScrapeComplete) {
+                  onScrapeComplete();
+              }
             }
             else if (statusResult.status === 'error') {
               clearInterval(pollingIntervalRef.current);

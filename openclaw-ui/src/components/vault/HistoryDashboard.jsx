@@ -71,9 +71,7 @@ const CustomDropdown = ({ value, options, onChange, icon: Icon, placeholder }) =
   );
 };
 
-export default function HistoryDashboard({ user }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function HistoryDashboard({ user, history, setHistory, loading }) {
 
   const [filterCity, setFilterCity] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
@@ -90,25 +88,6 @@ export default function HistoryDashboard({ user }) {
   const [activeLead, setActiveLead] = useState(null);
   const [editedPitch, setEditedPitch] = useState("");
   const [isSavingPitch, setIsSavingPitch] = useState(false);
-
-  useEffect(() => {
-    const fetchHistory = async () => {
-      if (!user) return;
-      try {
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE}/api/history?user_id=${user.id}`);
-        const result = await response.json();
-        if (result.status === 'success') {
-          setHistory(result.data);
-        }
-      } catch (error) {
-        console.error("Failed to load history:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchHistory();
-  }, [user]);
 
   useEffect(() => {
     setSelectedLeads([]);
