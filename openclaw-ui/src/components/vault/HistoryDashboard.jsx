@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Users, Download, Clock, Loader2, MessageCircle, Filter, ChevronDown, Trash2, Calendar, Check, X } from 'lucide-react';
+import { Users, Download, Clock, Loader2, MessageCircle, Filter, ChevronDown, Trash2, Calendar, Check, X, Sparkles, Save, ShieldAlert, TrendingUp, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // 🛠️ DEV FIX 1: Premium Custom Checkbox
@@ -84,6 +84,12 @@ export default function HistoryDashboard({ user }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Insights Modal States
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [activeLead, setActiveLead] = useState(null);
+  const [editedPitch, setEditedPitch] = useState("");
+  const [isSavingPitch, setIsSavingPitch] = useState(false);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -196,6 +202,46 @@ export default function HistoryDashboard({ user }) {
     a.href = url;
     a.download = `Clarion_LeadVault_${filterCity}_${filterCategory}.csv`;
     a.click();
+  };
+
+  const handleSavePitch = async () => {
+    setIsSavingPitch(true);
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+    try {
+      const response = await fetch(`${API_BASE}/api/leads/update-pitch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          whatsapp_link: activeLead["WhatsApp Link"],
+          new_pitch: editedPitch
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        // Instantly update the local state so the user sees the change
+        setHistory(prev => prev.map(lead =>
+          lead["WhatsApp Link"] === activeLead["WhatsApp Link"]
+            ? { ...lead, Pitch: editedPitch }
+            : lead
+        ));
+        toast.success("Pitch updated successfully!");
+        setIsInsightsOpen(false);
+      } else {
+        toast.error("Failed to save pitch.");
+      }
+    } catch (error) {
+      toast.error("Network error while saving.");
+    } finally {
+      setIsSavingPitch(false);
+    }
+  };
+
+  const openInsights = (lead) => {
+    setActiveLead(lead);
+    setEditedPitch(lead.Pitch || "");
+    setIsInsightsOpen(true);
   };
 
   return (
@@ -362,11 +408,21 @@ export default function HistoryDashboard({ user }) {
                         {lead["Business Name"]}
                       </td>
                       <td className="px-5 py-4">
+                        {/* Action Buttons Container */}
                         <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => openInsights(lead)}
+                            className="inline-flex items-center space-x-1 bg-purple-600/10 hover:bg-purple-600/20 text-purple-400 border border-purple-500/20 px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm text-xs"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            <span>Insights</span>
+                          </button>
+
                           <a href={getWhatsAppActionUrl(lead["WhatsApp Link"], lead["Pitch"])} target="_blank" rel="noreferrer" className="inline-flex items-center space-x-1 bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md font-bold transition-colors shadow-sm text-xs">
                             <MessageCircle className="w-3 h-3" />
                             <span>Send Pitch</span>
                           </a>
+
                           <button onClick={() => triggerSingleDelete(lead["WhatsApp Link"], lead["Business Name"])} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors" title="Delete Lead">
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -417,6 +473,99 @@ export default function HistoryDashboard({ user }) {
                 <span>{isDeleting ? 'Deleting...' : 'Yes, Delete'}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* INSIGHTS & EDIT MODAL */}
+      {isInsightsOpen && activeLead && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0B0F19] border border-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+
+            {/* Header */}
+            <div className="p-5 sm:p-6 border-b border-gray-800 flex justify-between items-center bg-[#111827]">
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-widest">{activeLead["Business Name"]}</h3>
+                <p className="text-sm text-purple-400 font-bold mt-1 tracking-wide">{activeLead.Category || activeLead.category} • {activeLead.City || activeLead.city}</p>
+              </div>
+              <button onClick={() => setIsInsightsOpen(false)} className="p-2 text-gray-400 hover:text-white rounded-full hover:bg-gray-800 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+
+              {/* Intelligence Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-red-900/10 border border-red-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldAlert className="w-4 h-4 text-red-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-red-400">Website Status</h4>
+                  </div>
+                  <p className="text-sm text-gray-300 font-mono">{activeLead["Website Faults"] || "N/A"}</p>
+                </div>
+
+                <div className="bg-green-900/10 border border-green-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-green-400">AI Strength</h4>
+                  </div>
+                  <p className="text-sm text-gray-300">{activeLead["AI Strength"] || "N/A"}</p>
+                </div>
+
+                <div className="bg-yellow-900/10 border border-yellow-500/20 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingDown className="w-4 h-4 text-yellow-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-yellow-400">AI Weakness</h4>
+                  </div>
+                  <p className="text-sm text-gray-300">{activeLead["AI Weakness"] || "N/A"}</p>
+                </div>
+              </div>
+
+              {/* Pitch Editor */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500" /> Generated Pitch
+                  </h4>
+                  <span className="text-xs text-gray-500 font-bold">Editable</span>
+                </div>
+                <textarea
+                  value={editedPitch}
+                  onChange={(e) => setEditedPitch(e.target.value)}
+                  className="w-full h-48 bg-black/50 border border-gray-700 focus:border-purple-500 rounded-xl p-4 text-gray-200 text-sm leading-relaxed outline-none transition-colors custom-scrollbar resize-none"
+                  placeholder="The AI pitch will appear here..."
+                />
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-5 sm:p-6 bg-[#111827] border-t border-gray-800 flex flex-col sm:flex-row justify-end gap-3 z-10">
+              <button
+                onClick={() => setIsInsightsOpen(false)}
+                className="px-6 py-3 rounded-lg font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePitch}
+                disabled={isSavingPitch || editedPitch === activeLead.Pitch}
+                className="px-6 py-3 rounded-lg font-bold text-white bg-purple-600 hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {isSavingPitch ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>Save Changes</span>
+              </button>
+              <a
+                href={getWhatsAppActionUrl(activeLead["WhatsApp Link"], editedPitch)}
+                target="_blank"
+                rel="noreferrer"
+                className="px-6 py-3 rounded-lg font-bold text-white bg-green-500 hover:bg-green-600 flex items-center justify-center gap-2 transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Send via WhatsApp</span>
+              </a>
+            </div>
+
           </div>
         </div>
       )}

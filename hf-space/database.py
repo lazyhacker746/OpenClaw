@@ -130,3 +130,22 @@ def delete_user_leads(user_id: str, whatsapp_links: List[str]):
     except Exception as e:
         print(f"[-] Bulk Delete Error: {e}")
         return False, 0
+
+
+def update_lead_pitch(whatsapp_link: str, new_pitch: str):
+    """
+    Allows a user to manually edit and save the AI-generated pitch.
+    """
+    try:
+        response = supabase.table('master_leads') \
+            .update({'pitch': new_pitch}) \
+            .eq('whatsapp_link', whatsapp_link) \
+            .execute()
+
+        # Check if the update actually found a row to modify
+        if response.data:
+            return True
+        return False
+    except Exception as e:
+        print(f"[-] Pitch Update Error: {e}")
+        return False

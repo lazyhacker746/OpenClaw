@@ -12,7 +12,7 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_leads
+from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch
 
 app = FastAPI(title="Clarion API", version="2.0")
 
@@ -42,6 +42,10 @@ class LeadRequest(BaseModel):
 class DeleteRequest(BaseModel):
     whatsapp_links: List[str] # 👈 Changed from string to list
     user_id: str
+
+class UpdatePitchRequest(BaseModel):
+    whatsapp_link: str
+    new_pitch: str
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -150,6 +154,18 @@ def get_history(user_id: str):
     except Exception as e:
         print(f"[-] Database Error: {e}")
         return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/leads/update-pitch")
+def update_pitch(request: UpdatePitchRequest):
+    print(f"\n[!] Saving manually edited pitch for {request.whatsapp_link}")
+
+    success = update_lead_pitch(request.whatsapp_link, request.new_pitch)
+
+    if success:
+        return {"status": "success", "message": "Pitch saved successfully."}
+    else:
+        return {"status": "error", "message": "Failed to save pitch."}
 
 
 if __name__ == "__main__":
