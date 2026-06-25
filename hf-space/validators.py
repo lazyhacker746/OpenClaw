@@ -1,6 +1,5 @@
 import re
 
-
 def validate_inputs(payload):
     errors = []
 
@@ -12,8 +11,14 @@ def validate_inputs(payload):
     use_ai = bool(payload.get("use_ai", True))
     sadapay_link = str(payload.get("sadapay_link", "")).strip()
 
-    if not city or not re.match(r"^[a-zA-Z\s]+$", city):
-        errors.append("City must contain only letters and spaces.")
+    # 👈 FIX: Bypass strict validation if it is a map coordinate string
+    if not city:
+        errors.append("City or Area is required.")
+    elif not city.startswith("coords:"):
+        # If it is NOT a map coordinate, enforce the letters-only rule
+        if not re.match(r"^[a-zA-Z\s]+$", city):
+            errors.append("City must contain only letters and spaces.")
+
     if not category or not re.match(r"^[a-zA-Z\s]+$", category):
         errors.append("Category must contain only letters and spaces.")
 
