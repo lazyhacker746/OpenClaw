@@ -12,7 +12,7 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch
+from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch, check_and_eval_credits, deduct_user_credits
 
 app = FastAPI(title="Clarion API", version="2.0")
 
@@ -71,12 +71,19 @@ def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict
 
             # Route to Supabase Cloud Vault
             print(f"[+] Routing {len(results)} leads to Clarion Cloud Vault for User {request.user_id}...")
-            save_leads_to_db(
+
+            # 👇 CHANGED: Capture the return value so we know exactly how many were successfully saved
+            saved_count = save_leads_to_db(
                 city=clean_data['city'],
                 category=clean_data['category'],
                 leads=results,
                 user_id=request.user_id
             )
+
+            # 👇 NEW: Safely deduct credits based on what actually made it into the vault!
+            if saved_count > 0:
+                use_ai = clean_data.get('use_ai', True)
+                deduct_user_credits(request.user_id, saved_count, use_ai)
 
             print(f"[+] SUCCESS: Task {task_id} completed.")
             # Set final status so React stops polling and displays the data
@@ -93,8 +100,8 @@ def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict
 
 # --- ENDPOINT 1: Start the Search ---
 @app.post("/api/generate")
-def generate_leads(request: LeadRequest, background_tasks: BackgroundTasks):  # 👈 Added BackgroundTasks injection
-    print(f"\n[+] INCOMING REQUEST: Targeting {request.category} in {request.city}")
+def generate_leads(request: LeadRequest, background_tasks: BackgroundTasks):
+    print(f"\n[+] INCOMING REQUEST: Targeting {request.category} in {request.city} for User {request.user_id}")
 
     payload = request.model_dump()
     errors, clean_data = validate_inputs(payload)
@@ -103,7 +110,33 @@ def generate_leads(request: LeadRequest, background_tasks: BackgroundTasks):  # 
         print("[-] VALIDATION FAILED")
         return {"status": "error", "message": errors}
 
-    print("[+] VALIDATION PASSED. Queuing Background Task...")
+    # --- 🛡️ NEW SECURITY GATE: CREDIT & TIER CHECKS ---
+
+    profile = check_and_eval_credits(request.user_id)
+    if not profile:
+        return {"status": "error", "message": ["Failed to authenticate your account tier profile."]}
+
+    # Check standard search balance requirements
+    target_leads = clean_data.get('target_leads', 10)
+    if profile['standard_credits'] < target_leads:
+        return {
+            "status": "error",
+            "message": [
+                f"Insufficient search credits. You have {profile['standard_credits']} remaining. Next reset in 3 days."]
+        }
+
+    # Check AI text generator payload limits
+    use_ai = clean_data.get('use_ai', True)
+    if use_ai and profile['ai_credits'] < target_leads:
+        return {
+            "status": "error",
+            "message": [
+                f"Insufficient AI copy generation credits. You have {profile['ai_credits']} left. Turn off AI or upgrade your tier."]
+        }
+
+    # --- END SECURITY GATE ---
+
+    print("[+] VALIDATION & SECURITY PASSED. Queuing Background Task...")
 
     # 1. Generate a unique receipt ticket for this search
     task_id = str(uuid.uuid4())

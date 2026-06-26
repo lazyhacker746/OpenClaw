@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from typing import List
+from datetime import datetime, timezone, timedelta
 
 load_dotenv()
 
@@ -193,3 +194,49 @@ def deduct_user_credits(user_id: str, leads_found: int, used_ai: bool):
     except Exception as e:
         print(f"[-] Credit Deduction Error: {e}")
         return False
+
+def check_and_eval_credits(user_id: str):
+    """
+    Evaluates the 3-day (72-hour) reset rule using strict server UTC time.
+    Replenishes allowances according to the user's assigned tier profile.
+    """
+    try:
+        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
+        if not response.data:
+            return None
+
+        profile = response.data[0]
+        # Parse the timestamp cleanly regardless of format trailing variants
+        last_reset_str = profile['last_reset_date'].replace('Z', '+00:00')
+        last_reset = datetime.fromisoformat(last_reset_str)
+        now = datetime.now(timezone.utc)
+
+        # Check if 72 hours have fully elapsed
+        if now - last_reset >= timedelta(days=3):
+            role = profile.get('role', 'user')
+
+            # Tier-based limitation allocation
+            if role == 'admin':
+                standard_limit = 9999
+                ai_limit = 9999
+            elif role == 'pro':
+                standard_limit = 500
+                ai_limit = 100
+            else:  # standard default user tier
+                standard_limit = 50
+                ai_limit = 10
+
+            update_payload = {
+                "standard_credits": standard_limit,
+                "ai_credits": ai_limit,
+                "last_reset_date": now.isoformat()
+            }
+
+            reset_response = supabase.table('profiles').update(update_payload).eq('id', user_id).execute()
+            if reset_response.data:
+                return reset_response.data[0]
+
+        return profile
+    except Exception as e:
+        print(f"[-] Security Balance Reset Evaluation Error: {e}")
+        return None
