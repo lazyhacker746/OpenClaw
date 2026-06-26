@@ -149,3 +149,47 @@ def update_lead_pitch(whatsapp_link: str, new_pitch: str):
     except Exception as e:
         print(f"[-] Pitch Update Error: {e}")
         return False
+
+
+def get_user_profile(user_id: str):
+    """
+    Fetches the user's profile, tier, and credit balances.
+    """
+    try:
+        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
+        if response.data:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"[-] Profile Fetch Error: {e}")
+        return None
+
+
+def deduct_user_credits(user_id: str, leads_found: int, used_ai: bool):
+    """
+    Safely subtracts credits from the user's balance after a successful scrape.
+    """
+    try:
+        # 1. Fetch current balances
+        profile = get_user_profile(user_id)
+        if not profile:
+            return False
+
+        new_standard = max(0, profile['standard_credits'] - leads_found)
+
+        # 2. Prepare the update payload
+        update_data = {"standard_credits": new_standard}
+
+        # 3. Only deduct AI credits if they actually used the AI feature
+        if used_ai:
+            update_data["ai_credits"] = max(0, profile['ai_credits'] - leads_found)
+
+        # 4. Save the new balances to the database
+        supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+
+        print(f"[+] DATABASE: Deducted {leads_found} credits from User {user_id}.")
+        return True
+
+    except Exception as e:
+        print(f"[-] Credit Deduction Error: {e}")
+        return False
