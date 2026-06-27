@@ -9,7 +9,7 @@ import HistoryDashboard from './components/vault/HistoryDashboard';
 import LeadForm from './components/generator/LeadForm';
 import ResultsTable from './components/generator/ResultsTable';
 import Navbar from './components/layout/Navbar';
-
+import SettingsDashboard from './components/settings/SettingsDashboard';
 
 export default function App() {
   // --- State Management ---
@@ -155,7 +155,8 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'generator' ? (
+        {/* TAB 1: GENERATOR */}
+        {activeTab === 'generator' && (
           <div className="flex flex-col md:flex-row gap-8">
             <div className="w-full md:w-1/3">
               <LeadForm
@@ -163,7 +164,7 @@ export default function App() {
                 setIsGenerating={setIsGenerating}
                 isGenerating={isGenerating}
                 user={session.user}
-                onScrapeComplete={() => fetchVaultHistory(true)} // 👈 NEW: Triggers background refresh!
+                onScrapeComplete={() => fetchVaultHistory(true)}
               />
             </div>
             <div className="w-full md:w-2/3">
@@ -173,13 +174,21 @@ export default function App() {
               />
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* TAB 2: VAULT */}
+        {activeTab === 'vault' && (
           <HistoryDashboard
             user={session.user}
-            history={vaultHistory}        // 👈 NEW: Pass cached data down
-            setHistory={setVaultHistory}  // 👈 NEW: Let Vault modify cache (for deletes/edits)
-            loading={isVaultLoading}      // 👈 NEW: Pass loading state
+            history={vaultHistory}
+            setHistory={setVaultHistory}
+            loading={isVaultLoading}
           />
+        )}
+
+        {/* TAB 3: SETTINGS (NEW) */}
+        {activeTab === 'settings' && (
+          <SettingsDashboard user={session.user} />
         )}
       </main>
     </div>

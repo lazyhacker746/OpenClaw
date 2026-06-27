@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sun, Moon, Search, Users, Menu, X, LogOut } from 'lucide-react';
+import { Sun, Moon, Search, Users, Menu, X, LogOut, User } from 'lucide-react';
 
 // 👈 NEW: Added isGenerating to the props
 export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, isGenerating }) {
@@ -68,6 +68,20 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
               <Search className="w-4 h-4" />
               <span>Generator</span>
             </button>
+
+            <button
+              disabled={isGenerating}
+              onClick={() => handleTabChange('settings')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                activeTab === 'settings'
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <User className="w-4 h-4" /> {/* Make sure to import User from lucide-react at the top! */}
+              <span>Settings</span>
+            </button>
+
             <button
               disabled={isGenerating}
               title={isGenerating ? "Please wait for the active search to finish" : ""}
@@ -164,6 +178,20 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
                       <Search className="w-4 h-4" />
                       <span>Generator</span>
                     </button>
+
+                    <button
+                      disabled={isGenerating}
+                      onClick={() => handleTabChange('settings')}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                        activeTab === 'settings'
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <User className="w-4 h-4" /> {/* Make sure to import User from lucide-react at the top! */}
+                      <span>Settings</span>
+                    </button>
+
                     <button
                       disabled={isGenerating}
                       onClick={() => handleTabChange('vault')}

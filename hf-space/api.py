@@ -12,7 +12,7 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch, check_and_eval_credits, deduct_user_credits
+from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch, check_and_eval_credits, deduct_user_credits, get_user_profile, update_user_settings
 
 app = FastAPI(title="Clarion API", version="2.0")
 
@@ -46,6 +46,10 @@ class DeleteRequest(BaseModel):
 class UpdatePitchRequest(BaseModel):
     whatsapp_link: str
     new_pitch: str
+
+class SettingsRequest(BaseModel):
+    user_id: str
+    sadapay_link: str
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -199,6 +203,21 @@ def update_pitch(request: UpdatePitchRequest):
         return {"status": "success", "message": "Pitch saved successfully."}
     else:
         return {"status": "error", "message": "Failed to save pitch."}
+
+
+@app.get("/api/user/profile")
+def fetch_profile(user_id: str):
+    profile = get_user_profile(user_id)
+    if profile:
+        return {"status": "success", "data": profile}
+    return {"status": "error", "message": "Profile not found."}
+
+@app.post("/api/user/settings")
+def save_settings(request: SettingsRequest):
+    success = update_user_settings(request.user_id, request.sadapay_link)
+    if success:
+        return {"status": "success", "message": "Settings saved successfully."}
+    return {"status": "error", "message": "Failed to save settings."}
 
 
 if __name__ == "__main__":

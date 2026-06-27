@@ -240,3 +240,13 @@ def check_and_eval_credits(user_id: str):
     except Exception as e:
         print(f"[-] Security Balance Reset Evaluation Error: {e}")
         return None
+
+
+def update_user_settings(user_id: str, sadapay_link: str):
+    """Saves the user's custom settings."""
+    try:
+        supabase.table('profiles').update({'default_sadapay': sadapay_link}).eq('id', user_id).execute()
+        return True
+    except Exception as e:
+        print(f"[-] Settings Update Error: {e}")
+        return False
