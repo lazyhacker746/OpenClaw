@@ -114,7 +114,7 @@ export default function App() {
       fetchVaultHistory();
       fetchUserProfile();
     }
-  }, [session?.user, fetchVaultHistory, fetchUserProfile()]);
+  }, [session?.user, fetchVaultHistory, fetchUserProfile]);
 
   // --- Actions ---
   const handleLogout = async () => {
