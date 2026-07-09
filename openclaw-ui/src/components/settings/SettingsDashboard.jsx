@@ -2,33 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { User, CreditCard, Zap, Calendar, Link as LinkIcon, Save, Loader2, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function SettingsDashboard({ user }) {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+// 👈 1. Accept the new props from App.jsx
+export default function SettingsDashboard({ user, profile, setProfile, loading }) {
 
-  // Form States
+  // 👈 2. We only need local state for the input box and the save button
   const [sadapayLink, setSadapayLink] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // 👈 3. Sync the input box with the cached profile data when it arrives
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE}/api/user/profile?user_id=${user.id}`);
-        const result = await response.json();
-
-        if (result.status === 'success') {
-          setProfile(result.data);
-          setSadapayLink(result.data.default_sadapay || '');
-        }
-      } catch (error) {
-        console.error("Failed to load profile:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchProfile();
-  }, [user]);
+    if (profile) {
+      setSadapayLink(profile.default_sadapay || '');
+    }
+  }, [profile]);
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -44,8 +30,14 @@ export default function SettingsDashboard({ user }) {
         })
       });
       const result = await response.json();
-      if (result.status === 'success') toast.success('Settings saved successfully!');
-      else toast.error('Failed to save settings.');
+
+      if (result.status === 'success') {
+        toast.success('Settings saved successfully!');
+        // 👈 4. Instantly update the global cache so the UI reflects the change!
+        setProfile(prev => ({ ...prev, default_sadapay: sadapayLink }));
+      } else {
+        toast.error('Failed to save settings.');
+      }
     } catch (error) {
       toast.error('Network error saving settings.');
     } finally {
@@ -62,9 +54,8 @@ export default function SettingsDashboard({ user }) {
     );
   }
 
-  // Format the reset date
-  const resetDate = new Date(profile?.last_reset_date);
-  resetDate.setDate(resetDate.getDate() + 3); // Add 3 days
+  const resetDate = profile?.last_reset_date ? new Date(profile.last_reset_date) : new Date();
+  resetDate.setDate(resetDate.getDate() + 3);
   const formattedDate = resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (

@@ -29,6 +29,10 @@ export default function App() {
   const [isVaultLoaded, setIsVaultLoaded] = useState(false);
   const [isVaultLoading, setIsVaultLoading] = useState(false);
 
+  // 👈 NEW: Global Profile State (Persists across tab changes)
+  const [userProfile, setUserProfile] = useState(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
+
   // --- Theme Initialization ---
   useEffect(() => {
     const stored = localStorage.getItem('theme');
@@ -82,12 +86,35 @@ export default function App() {
     }
   }, [isVaultLoaded, session?.user]);
 
+  // 👈 NEW: Global Fetch Function for the User Profile
+  const fetchUserProfile = useCallback(async (forceRefresh = false) => {
+    // If it's already loaded and we aren't forcing a refresh, skip the network request!
+    if (userProfile && !forceRefresh) return;
+    if (!session?.user) return;
+
+    setIsProfileLoading(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/user/profile?user_id=${session.user.id}`);
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        setUserProfile(result.data);
+      }
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    } finally {
+      setIsProfileLoading(false);
+    }
+  }, [userProfile, session?.user]);
+
   // 👈 NEW: Fetch vault data once the user is authenticated
   useEffect(() => {
     if (session?.user) {
       fetchVaultHistory();
+      fetchUserProfile();
     }
-  }, [session?.user, fetchVaultHistory]);
+  }, [session?.user, fetchVaultHistory, fetchUserProfile()]);
 
   // --- Actions ---
   const handleLogout = async () => {
@@ -188,7 +215,12 @@ export default function App() {
 
         {/* TAB 3: SETTINGS (NEW) */}
         {activeTab === 'settings' && (
-          <SettingsDashboard user={session.user} />
+          <SettingsDashboard
+            user={session.user}
+            profile={userProfile}          // 👈 Pass the cached data
+            setProfile={setUserProfile}    // 👈 Let Settings update the cache on save
+            loading={isProfileLoading}     // 👈 Pass the loading state
+          />
         )}
       </main>
     </div>
