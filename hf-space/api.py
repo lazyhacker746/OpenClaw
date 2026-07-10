@@ -13,7 +13,7 @@ from scraper import run_scraper
 
 # Supabase database imports
 from database import (
-    save_leads_to_db, get_user_vault, delete_user_leads,
+    supabase, save_leads_to_db, get_user_vault, delete_user_leads,
     update_lead_pitch, check_and_eval_credits, deduct_user_credits,
     get_user_profile, update_user_settings, get_all_profiles, update_user_tier # 👈 Added the new functions
 )
@@ -61,6 +61,10 @@ class AdminUpdateRequest(BaseModel):
     new_role: str
     standard_credits: int
     ai_credits: int
+
+class AdminDeleteRequest(BaseModel):
+    requester_id: str
+    target_user_id: str
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -261,6 +265,24 @@ def update_user(request: AdminUpdateRequest):
         return {"status": "success", "message": message}
     else:
         return {"status": "error", "message": message}
+
+
+@app.post("/api/admin/users/delete")
+def delete_user_account(request: AdminDeleteRequest):
+    print(f"\n[!] ADMIN PROTOCOL: Deletion requested by {request.requester_id} for target {request.target_user_id}")
+
+    # 1. Verify admin clearance
+    requester_profile = get_user_profile(request.requester_id)
+    if not requester_profile or requester_profile.get('role') != 'admin':
+        return {"status": "error", "message": "Unauthorized access."}
+
+    try:
+        # 2. Hard delete the user from auth.users (Supabase cascades this deletion to profiles)
+        response = supabase.auth.admin.delete_user(request.target_user_id)
+        return {"status": "success", "message": "User permanently deleted."}
+    except Exception as e:
+        print(f"[-] Admin Delete Error: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     print("🚀 Clarion Backend API Initializing on Port 8000...")
