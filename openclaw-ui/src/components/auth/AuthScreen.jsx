@@ -38,6 +38,13 @@ export default function AuthScreen() {
     setLoading(true);
     const cleanEmail = email.trim(); 
 
+    // 🚨 STRICT DOMAIN LOCK: Only allow @gmail.com during Registration
+    if (!isLogin && !cleanEmail.toLowerCase().endsWith('@gmail.com')) {
+      toast.error("Registration is currently restricted to @gmail.com accounts only.");
+      setLoading(false);
+      return;
+    }
+
     try {
       if (isLogin) {
         // LOGIN
