@@ -78,7 +78,7 @@ export default function SettingsDashboard({ user, profile, setProfile, loading }
                 profile?.role === 'pro' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
                 'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
               {profile?.role === 'admin' && <Shield className="w-3 h-3" />}
-              {profile?.role || 'User'} Plan
+              {(!profile?.role || String(profile.role).toLowerCase() === 'user') ? 'Free' : profile.role} Plan
             </span>
           </div>
         </div>
