@@ -17,6 +17,7 @@ export default function CommandCenter({ user }) {
   const [editAi, setEditAi] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -58,6 +59,7 @@ export default function CommandCenter({ user }) {
     setEditRole(targetUser.role || 'user');
     setEditStandard(targetUser.standard_credits);
     setEditAi(targetUser.ai_credits);
+    setShowDeleteConfirm(false);
   };
 
   const handleSaveUpdate = async () => {
@@ -94,7 +96,6 @@ export default function CommandCenter({ user }) {
   };
 
   const handleDeleteUser = async () => {
-    if (!window.confirm(`CRITICAL WARNING: Are you sure you want to permanently delete ${editingUser.email}? This cannot be undone.`)) return;
 
     setIsDeleting(true);
     try {
@@ -283,29 +284,48 @@ export default function CommandCenter({ user }) {
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 dark:bg-black/40 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center gap-3">
-              <button
-                onClick={handleDeleteUser}
-                disabled={isDeleting || editingUser.id === user.id} // Prevent self-deletion
-                className="p-2.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
-                title="Ban / Delete User"
-              >
-                {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-              </button>
+            <div className="p-6 bg-gray-50 dark:bg-black/40 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center gap-3 min-h-[80px]">
+              {showDeleteConfirm ? (
+                <div className="w-full flex items-center justify-between bg-red-500/10 border border-red-500/30 p-3 rounded-lg animate-in fade-in zoom-in duration-200">
+                  <span className="text-sm font-bold text-red-600 dark:text-red-500 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" /> Confirm Deletion?
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-bold transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleDeleteUser} disabled={isDeleting} className="px-4 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50">
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      <span>Yes, Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeleting || editingUser.id === user.id}
+                    className="p-2.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                    title="Ban / Delete User"
+                  >
+                    {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                  </button>
 
-              <div className="flex gap-3">
-                <button onClick={() => setEditingUser(null)} className="px-5 py-2.5 rounded-lg font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveUpdate}
-                  disabled={isSaving}
-                  className="px-5 py-2.5 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 text-sm shadow-md dark:shadow-[0_0_15px_rgba(220,38,38,0.4)]"
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  <span>Execute Override</span>
-                </button>
-              </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => { setEditingUser(null); setShowDeleteConfirm(false); }} className="px-5 py-2.5 rounded-lg font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveUpdate}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 text-sm shadow-md dark:shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>Execute Override</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
