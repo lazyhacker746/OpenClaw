@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sun, Moon, Search, Users, Menu, X, LogOut, User } from 'lucide-react';
+import { Sun, Moon, Search, Users, Menu, X, LogOut, User, ShieldAlert } from 'lucide-react';
 
 // 👈 NEW: Added isGenerating to the props
 export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, profile, isGenerating }) {
