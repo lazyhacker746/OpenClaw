@@ -11,6 +11,7 @@ import ResultsTable from './components/generator/ResultsTable';
 import Navbar from './components/layout/Navbar';
 import SettingsDashboard from './components/settings/SettingsDashboard';
 import AdminGuard from './components/auth/AdminGuard';
+import CommandCenter from './components/admin/CommandCenter';
 
 export default function App() {
   // --- State Management ---
@@ -228,11 +229,7 @@ export default function App() {
         {/* TAB 4: ADMIN COMMAND CENTER (SECURED) */}
         {activeTab === 'admin' && (
           <AdminGuard profile={userProfile} setActiveTab={setActiveTab}>
-             {/* We will build the actual CommandCenter UI component and place it here next! */}
-             <div className="p-8 text-center text-white border border-red-500/50 bg-red-900/20 rounded-2xl backdrop-blur-xl">
-                <h1 className="text-2xl font-black uppercase text-red-500">Terminal Access Granted</h1>
-                <p className="mt-2 text-red-400">Awaiting UI construction...</p>
-             </div>
+             <CommandCenter user={session.user} />
           </AdminGuard>
         )}
 
