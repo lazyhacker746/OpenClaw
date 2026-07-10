@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sun, Moon, Search, Users, Menu, X, LogOut, User } from 'lucide-react';
 
 // 👈 NEW: Added isGenerating to the props
-export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, isGenerating }) {
+export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, profile, isGenerating }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fullName = user?.user_metadata?.full_name;
@@ -81,6 +81,22 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
               <User className="w-4 h-4" /> {/* Make sure to import User from lucide-react at the top! */}
               <span>Settings</span>
             </button>
+
+            {/* ADMIN COMMAND CENTER (Only visible to Admins) */}
+            {profile?.role === 'admin' && (
+              <button
+                disabled={isGenerating}
+                onClick={() => handleTabChange('admin')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                  activeTab === 'admin'
+                    ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                    : 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <ShieldAlert className="w-4 h-4" />
+                <span>Command Center</span>
+              </button>
+            )}
 
             <button
               disabled={isGenerating}
@@ -191,6 +207,22 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
                       <User className="w-4 h-4" /> {/* Make sure to import User from lucide-react at the top! */}
                       <span>Settings</span>
                     </button>
+
+                    {/* ADMIN COMMAND CENTER (Only visible to Admins) */}
+                    {profile?.role === 'admin' && (
+                      <button
+                        disabled={isGenerating}
+                        onClick={() => handleTabChange('admin')}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                          activeTab === 'admin'
+                            ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                            : 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                        } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                        <span>Command Center</span>
+                      </button>
+                    )}
 
                     <button
                       disabled={isGenerating}
