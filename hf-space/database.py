@@ -250,3 +250,54 @@ def update_user_settings(user_id: str, sadapay_link: str):
     except Exception as e:
         print(f"[-] Settings Update Error: {e}")
         return False
+
+
+def get_all_profiles(requester_id: str):
+    """
+    Fetches all registered users from the vault, but ONLY if the requester
+    is verified as an admin in the database.
+    """
+    try:
+        # 1. Verify the requester's identity and clearance level
+        requester_profile = get_user_profile(requester_id)
+        if not requester_profile or requester_profile.get('role') != 'admin':
+            return False, "Unauthorized access. Admin clearance required."
+
+        # 2. Fetch all profiles if clearance is granted
+        response = supabase.table('profiles').select('*').order('created_at', desc=True).execute()
+        return True, response.data
+
+    except Exception as e:
+        print(f"[-] Admin Vault Retrieval Error: {e}")
+        return False, str(e)
+
+
+def update_user_tier(requester_id: str, target_user_id: str, new_role: str, standard_credits: int, ai_credits: int):
+    """
+    Allows an admin to modify another user's role and credit limits.
+    """
+    try:
+        # 1. Verify the requester's identity and clearance level
+        requester_profile = get_user_profile(requester_id)
+        if not requester_profile or requester_profile.get('role') != 'admin':
+            return False, "Unauthorized access. Admin clearance required."
+
+        # 2. Prepare the override payload
+        update_payload = {
+            "role": new_role,
+            "standard_credits": standard_credits,
+            "ai_credits": ai_credits
+        }
+
+        # 3. Execute the update on the target user
+        response = supabase.table('profiles').update(update_payload).eq('id', target_user_id).execute()
+
+        if response.data:
+            print(f"[+] ADMIN ACTION: User {target_user_id} upgraded to {new_role}.")
+            return True, "User updated successfully."
+
+        return False, "Target user not found or update failed."
+
+    except Exception as e:
+        print(f"[-] Admin Update Error: {e}")
+        return False, str(e)

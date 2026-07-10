@@ -12,7 +12,11 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch, check_and_eval_credits, deduct_user_credits, get_user_profile, update_user_settings
+from database import (
+    save_leads_to_db, get_user_vault, delete_user_leads,
+    update_lead_pitch, check_and_eval_credits, deduct_user_credits,
+    get_user_profile, update_user_settings, get_all_profiles, update_user_tier # 👈 Added the new functions
+)
 
 app = FastAPI(title="Clarion API", version="2.0")
 
@@ -50,6 +54,13 @@ class UpdatePitchRequest(BaseModel):
 class SettingsRequest(BaseModel):
     user_id: str
     sadapay_link: str
+
+class AdminUpdateRequest(BaseModel):
+    requester_id: str
+    target_user_id: str
+    new_role: str
+    standard_credits: int
+    ai_credits: int
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -219,6 +230,37 @@ def save_settings(request: SettingsRequest):
         return {"status": "success", "message": "Settings saved successfully."}
     return {"status": "error", "message": "Failed to save settings."}
 
+
+# --- ADMIN COMMAND PANEL ENDPOINTS ---
+
+@app.get("/api/admin/users")
+def get_all_users(requester_id: str):
+    print(f"\n[!] ADMIN PROTOCOL: Fetch requested by ID {requester_id}")
+
+    success, data = get_all_profiles(requester_id)
+
+    if success:
+        return {"status": "success", "data": data}
+    else:
+        return {"status": "error", "message": data}  # Contains the unauthorized error message
+
+
+@app.post("/api/admin/users/update")
+def update_user(request: AdminUpdateRequest):
+    print(f"\n[!] ADMIN PROTOCOL: Update requested by {request.requester_id} for target {request.target_user_id}")
+
+    success, message = update_user_tier(
+        request.requester_id,
+        request.target_user_id,
+        request.new_role,
+        request.standard_credits,
+        request.ai_credits
+    )
+
+    if success:
+        return {"status": "success", "message": message}
+    else:
+        return {"status": "error", "message": message}
 
 if __name__ == "__main__":
     print("🚀 Clarion Backend API Initializing on Port 8000...")
