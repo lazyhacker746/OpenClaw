@@ -12,12 +12,13 @@ import Navbar from './components/layout/Navbar';
 import SettingsDashboard from './components/settings/SettingsDashboard';
 import AdminGuard from './components/auth/AdminGuard';
 import CommandCenter from './components/admin/CommandCenter';
+import Dashboard from './components/dashboard/Dashboard';
 
 export default function App() {
   // --- State Management ---
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('generator');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   // Theme state
   const [isDark, setIsDark] = useState(true);
@@ -126,6 +127,8 @@ export default function App() {
       // Clean up cache on logout
       setVaultHistory([]);
       setIsVaultLoaded(false);
+      setUserProfile(null);
+      setActiveTab('dashboard');
     } catch (error) {
       console.error("Logout Error:", error);
     }
@@ -185,7 +188,19 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* TAB 1: GENERATOR */}
+        {/* TAB 1: HOME DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <Dashboard
+            user={session.user}
+            profile={userProfile}
+            history={vaultHistory}
+            profileLoading={isProfileLoading}
+            vaultLoading={isVaultLoading}
+            setActiveTab={setActiveTab}
+          />
+        )}
+
+        {/* TAB 2: GENERATOR */}
         {activeTab === 'generator' && (
           <div className="flex flex-col md:flex-row gap-8">
             <div className="w-full md:w-1/3">
@@ -194,7 +209,10 @@ export default function App() {
                 setIsGenerating={setIsGenerating}
                 isGenerating={isGenerating}
                 user={session.user}
-                onScrapeComplete={() => fetchVaultHistory(true)}
+                onScrapeComplete={() => {
+                  fetchVaultHistory(true);
+                  fetchUserProfile(true);
+                }}
               />
             </div>
             <div className="w-full md:w-2/3">
@@ -206,7 +224,7 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: VAULT */}
+        {/* TAB 3: VAULT */}
         {activeTab === 'vault' && (
           <HistoryDashboard
             user={session.user}
@@ -216,7 +234,7 @@ export default function App() {
           />
         )}
 
-        {/* TAB 3: SETTINGS (NEW) */}
+        {/* TAB 4: SETTINGS */}
         {activeTab === 'settings' && (
           <SettingsDashboard
             user={session.user}
@@ -226,7 +244,7 @@ export default function App() {
           />
         )}
 
-        {/* TAB 4: ADMIN COMMAND CENTER (SECURED) */}
+        {/* TAB 5: ADMIN COMMAND CENTER (SECURED) */}
         {activeTab === 'admin' && (
           <AdminGuard profile={userProfile} setActiveTab={setActiveTab}>
              <CommandCenter user={session.user} />

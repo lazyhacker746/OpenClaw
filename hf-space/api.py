@@ -222,7 +222,7 @@ def update_pitch(request: UpdatePitchRequest):
 
 @app.get("/api/user/profile")
 def fetch_profile(user_id: str):
-    profile = get_user_profile(user_id)
+    profile = check_and_eval_credits(user_id)
     if profile:
         return {"status": "success", "data": profile}
     return {"status": "error", "message": "Profile not found."}

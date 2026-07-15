@@ -57,6 +57,7 @@ backend_api/
   requirements.txt
   scraper.py
   ServerBackup_Clothing_taxila.csv
+  supabase_triggers.sql
   validators.py
 hf-space/
   exports/
@@ -87,7 +88,10 @@ openclaw-ui/
       react.svg
       vite.svg
     components/
+      admin/
+        CommandCenter.jsx
       auth/
+        AdminGuard.jsx
         AuthScreen.jsx
       generator/
         LeadForm.jsx
@@ -116,6 +120,49 @@ openclaw-ui/
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="backend_api/supabase_triggers.sql">
+-- 1. Ensure the profiles table has the necessary columns to catch the data
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name TEXT;
+
+-- 2. Create the automation function
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (
+    id,
+    email,
+    full_name,
+    role,
+    standard_credits,
+    ai_credits,
+    last_reset_date
+  )
+  VALUES (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'full_name', -- Extracts the name from your React AuthScreen payload
+    'user',                                -- Default tier
+    50,                                    -- Default Standard Searches
+    10,                                    -- Default AI Pitches
+    now()                                  -- Starts the 72-hour clock
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name;
+
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Bind the function to the authentication system
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+</file>
 
 <file path="backend_api/exports/ServerBackup_Gyms_Taxila.csv">
 Business Name,WhatsApp Link,Website Link,Review Count,Website Faults,AI Strength,AI Weakness,Pitch
@@ -763,6 +810,49 @@ Lunda Bazar Taxila Sanaullah Khanz,https://wa.me/923041065378,N/A,40,N/A,Highly 
 
 <file path="openclaw-ui/src/assets/vite.svg">
 <svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="openclaw-ui/src/components/auth/AdminGuard.jsx">
+import React from 'react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
+
+export default function AdminGuard({ profile, setActiveTab, children }) {
+  // 1. Await profile load to prevent false-positive rejections
+  if (!profile) {
+    return null;
+  }
+
+  // 2. The Strict Role Check
+  if (profile.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[600px] text-center space-y-6 bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-red-500/20 rounded-2xl p-8 shadow-2xl">
+        <div className="w-24 h-24 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.2)]">
+          <ShieldAlert className="w-12 h-12 text-red-500" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-widest uppercase">
+            Access Denied
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto font-medium">
+            You do not have the required clearance level to view the Admin Command Center. This incident has been logged.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setActiveTab('generator')}
+          className="mt-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold py-3 px-8 rounded-lg transition-transform hover:scale-105 flex items-center gap-2"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Return to Generator</span>
+        </button>
+      </div>
+    );
+  }
+
+  // 3. Clearance Granted: Render the enclosed component
+  return <>{children}</>;
+}
 </file>
 
 <file path="openclaw-ui/src/components/generator/ResultsTable.jsx">
@@ -1718,157 +1808,6 @@ def validate_inputs(payload):
     return errors, clean_data
 </file>
 
-<file path="openclaw-ui/src/components/settings/SettingsDashboard.jsx">
-import React, { useState, useEffect } from 'react';
-import { User, CreditCard, Zap, Calendar, Link as LinkIcon, Save, Loader2, Shield } from 'lucide-react';
-import toast from 'react-hot-toast';
-
-// 👈 1. Accept the new props from App.jsx
-export default function SettingsDashboard({ user, profile, setProfile, loading }) {
-
-  // 👈 2. We only need local state for the input box and the save button
-  const [sadapayLink, setSadapayLink] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-
-  // 👈 3. Sync the input box with the cached profile data when it arrives
-  useEffect(() => {
-    if (profile) {
-      setSadapayLink(profile.default_sadapay || '');
-    }
-  }, [profile]);
-
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/user/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: user.id,
-          sadapay_link: sadapayLink
-        })
-      });
-      const result = await response.json();
-
-      if (result.status === 'success') {
-        toast.success('Settings saved successfully!');
-        // 👈 4. Instantly update the global cache so the UI reflects the change!
-        setProfile(prev => ({ ...prev, default_sadapay: sadapayLink }));
-      } else {
-        toast.error('Failed to save settings.');
-      }
-    } catch (error) {
-      toast.error('Network error saving settings.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-gray-400 min-h-[500px]">
-        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
-        <p className="font-bold tracking-widest uppercase">Loading Profile...</p>
-      </div>
-    );
-  }
-
-  const resetDate = profile?.last_reset_date ? new Date(profile.last_reset_date) : new Date();
-  resetDate.setDate(resetDate.getDate() + 3);
-  const formattedDate = resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-
-      {/* HEADER */}
-      <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-white font-black text-2xl shadow-lg">
-            {user?.email?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white">{user?.user_metadata?.full_name || 'Clarion User'}</h2>
-            <p className="text-gray-500 dark:text-gray-400 font-medium">{user?.email}</p>
-          </div>
-
-          <div className="ml-auto">
-            <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border flex items-center gap-2 shadow-sm
-              ${profile?.role === 'admin' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
-                profile?.role === 'pro' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
-              {profile?.role === 'admin' && <Shield className="w-3 h-3" />}
-              {profile?.role || 'User'} Plan
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* CREDITS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center gap-3 mb-4 text-purple-600 dark:text-purple-400">
-            <CreditCard className="w-5 h-5" />
-            <h3 className="font-bold tracking-wide uppercase text-sm">Standard Searches</h3>
-          </div>
-          <div className="text-4xl font-black text-gray-900 dark:text-white">{profile?.standard_credits}</div>
-        </div>
-
-        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center gap-3 mb-4 text-blue-600 dark:text-blue-400">
-            <Zap className="w-5 h-5" />
-            <h3 className="font-bold tracking-wide uppercase text-sm">AI Pitches</h3>
-          </div>
-          <div className="text-4xl font-black text-gray-900 dark:text-white">{profile?.ai_credits}</div>
-        </div>
-
-        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-          <div className="flex items-center gap-3 mb-4 text-green-600 dark:text-green-400">
-            <Calendar className="w-5 h-5" />
-            <h3 className="font-bold tracking-wide uppercase text-sm">Next Refill</h3>
-          </div>
-          <div className="text-xl font-bold text-gray-900 dark:text-white">{formattedDate}</div>
-        </div>
-      </div>
-
-      {/* PREFERENCES FORM */}
-      <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-          <User className="w-5 h-5 text-purple-500" /> Default Preferences
-        </h3>
-        <form onSubmit={handleSaveSettings} className="max-w-xl space-y-5">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Default Payment Link</label>
-            <div className="relative">
-              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-              <input
-                type="text"
-                value={sadapayLink}
-                onChange={(e) => setSadapayLink(e.target.value)}
-                placeholder="https://sadapay.pk/..."
-                className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-3 pl-10 pr-3 text-gray-900 dark:text-white text-sm outline-none transition-colors"
-              />
-            </div>
-            <p className="mt-2 text-xs text-gray-500">This link will automatically be applied to all your AI pitches.</p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
-            <span>Save Preferences</span>
-          </button>
-        </form>
-      </div>
-
-    </div>
-  );
-}
-</file>
-
 <file path="openclaw-ui/index.html">
 <!doctype html>
 <html lang="en">
@@ -2063,6 +2002,495 @@ def generate_pitch(shop_name, reviews, sadapay_link, mode, faults=None, use_ai=T
     return "N/A", "N/A", "Pitch generation failed."
 </file>
 
+<file path="openclaw-ui/src/components/admin/CommandCenter.jsx">
+import React, { useState, useEffect, useMemo } from 'react';
+import { ShieldAlert, Edit2, Save, X, Loader2, Database, Zap, CreditCard, Search, Filter, Trash2, Mail } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export default function CommandCenter({ user }) {
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+
+  // Modal Edit State
+  const [editingUser, setEditingUser] = useState(null);
+  const [editRole, setEditRole] = useState('user');
+  const [editStandard, setEditStandard] = useState(0);
+  const [editAi, setEditAi] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/admin/users?requester_id=${user.id}`);
+        const result = await response.json();
+
+        if (result.status === 'success') {
+          setUsers(result.data);
+        } else {
+          toast.error(result.message || "Failed to load users.");
+        }
+      } catch (error) {
+        toast.error("Network error connecting to Admin API.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [user.id]);
+
+  // Derived state for filtering
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const matchesSearch =
+        (u.full_name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        (u.email?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+        u.id.includes(searchQuery);
+
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+
+      return matchesSearch && matchesRole;
+    });
+  }, [users, searchQuery, roleFilter]);
+
+  const openEditModal = (targetUser) => {
+    setEditingUser(targetUser);
+    setEditRole(targetUser.role || 'user');
+    setEditStandard(targetUser.standard_credits);
+    setEditAi(targetUser.ai_credits);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleSaveUpdate = async () => {
+    setIsSaving(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/admin/users/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_id: user.id,
+          target_user_id: editingUser.id,
+          new_role: editRole,
+          standard_credits: Number(editStandard),
+          ai_credits: Number(editAi)
+        })
+      });
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        toast.success(`User updated successfully.`);
+        setUsers(prev => prev.map(u =>
+          u.id === editingUser.id ? { ...u, role: editRole, standard_credits: editStandard, ai_credits: editAi } : u
+        ));
+        setEditingUser(null);
+      } else {
+        toast.error(result.message || "Update failed.");
+      }
+    } catch (error) {
+      toast.error("Network error while updating user.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+
+    setIsDeleting(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/admin/users/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: user.id, target_user_id: editingUser.id })
+      });
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        toast.success("User permanently deleted.");
+        setUsers(prev => prev.filter(u => u.id !== editingUser.id));
+        setEditingUser(null);
+      } else {
+        toast.error(result.message || "Deletion failed.");
+      }
+    } catch (error) {
+      toast.error("Network error while deleting user.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] text-red-500">
+        <Loader2 className="w-12 h-12 animate-spin mb-4" />
+        <p className="font-bold tracking-widest uppercase text-sm">Accessing Secure Database...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/90 dark:bg-[#050505]/90 backdrop-blur-2xl border border-red-500/30 rounded-2xl p-4 sm:p-6 shadow-[0_0_50px_rgba(220,38,38,0.1)] flex-1 flex flex-col min-h-[600px] relative overflow-hidden transition-colors duration-300">
+
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-[2px] bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+
+      {/* HEADER & FILTERS */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 border-b border-red-500/20 pb-6 relative z-10 gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20 shadow-sm dark:shadow-[0_0_15px_rgba(220,38,38,0.2)]">
+            <ShieldAlert className="w-6 h-6 text-red-600 dark:text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-widest uppercase dark:drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]">Command Center</h2>
+            <p className="text-xs font-mono text-red-600 dark:text-red-400/70 uppercase tracking-widest mt-1">Level 4 Admin Clearance</p>
+          </div>
+        </div>
+
+        {/* CONTROLS */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="relative flex-1 sm:min-w-[250px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search email, name, or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 focus:border-red-500 rounded-lg py-2 pl-9 pr-4 text-sm text-gray-900 dark:text-white outline-none transition-colors"
+            />
+          </div>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="bg-gray-50 dark:bg-black/50 border border-gray-200 dark:border-gray-800 focus:border-red-500 rounded-lg py-2 pl-9 pr-4 text-sm text-gray-900 dark:text-white outline-none appearance-none cursor-pointer"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admins</option>
+              <option value="pro">Pro Users</option>
+              <option value="user">Free Users</option>
+            </select>
+          </div>
+          <div className="hidden sm:flex items-center space-x-2 bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 font-mono text-xs">
+            <Database className="w-4 h-4" />
+            <span>{filteredUsers.length} Found</span>
+          </div>
+        </div>
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar flex-1 border border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-black/50">
+        <table className="w-full text-sm text-left text-gray-700 dark:text-gray-300 relative">
+          <thead className="text-xs uppercase bg-gray-100 dark:bg-[#0B0F19] text-gray-600 dark:text-gray-500 font-bold sticky top-0 z-10 border-b border-gray-200 dark:border-gray-800 backdrop-blur-md">
+            <tr>
+              <th className="px-5 py-4 whitespace-nowrap">User Identity</th>
+              <th className="px-5 py-4">Clearance Role</th>
+              <th className="px-5 py-4">Credits (Std / AI)</th>
+              <th className="px-5 py-4 text-right">Admin Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-800/50">
+            {filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="text-center py-12 text-gray-500 font-bold uppercase tracking-widest">No users found</td>
+              </tr>
+            ) : (
+              filteredUsers.map((u) => (
+                <tr key={u.id} className="hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors group">
+                  <td className="px-5 py-4 font-mono text-xs">
+                    <span className="text-gray-900 dark:text-white block font-bold mb-1 font-sans">{u.full_name || 'Unknown User'}</span>
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1 mb-1"><Mail className="w-3 h-3"/> {u.email || 'No email synced'}</span>
+                    <span className="text-gray-400 dark:text-gray-600 text-[10px]">{u.id.substring(0, 12)}...</span>
+                  </td>
+                  <td className="px-5 py-4">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border
+                      ${u.role === 'admin' ? 'bg-red-100 text-red-600 border-red-300 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/30 dark:shadow-[0_0_10px_rgba(220,38,38,0.2)]' : 
+                        u.role === 'pro' ? 'bg-blue-100 text-blue-600 border-blue-300 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/30' : 
+                        'bg-gray-200 text-gray-600 border-gray-300 dark:bg-gray-500/10 dark:text-gray-400 dark:border-gray-500/30'}`}>
+                      {u.role || 'user'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 font-mono text-xs">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400 font-bold"><CreditCard className="w-3 h-3 text-gray-500"/> {u.standard_credits}</span>
+                      <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400 font-bold"><Zap className="w-3 h-3 text-purple-500 dark:text-blue-500"/> {u.ai_credits}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-right">
+                    <button
+                      onClick={() => openEditModal(u)}
+                      className="inline-flex items-center space-x-1 bg-white dark:bg-gray-800 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-700 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 border border-gray-300 dark:border-gray-700 hover:border-red-500/50 px-3 py-1.5 rounded-md font-bold transition-all text-xs shadow-sm"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Modify</span>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* OVERRIDE MODAL */}
+      {editingUser && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0B0F19] border border-gray-200 dark:border-red-500/30 rounded-2xl shadow-2xl dark:shadow-[0_0_50px_rgba(220,38,38,0.15)] w-full max-w-md overflow-hidden flex flex-col relative">
+
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-purple-600"></div>
+
+            <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-start bg-gray-50 dark:bg-transparent">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-widest">Override User Data</h3>
+                <p className="text-xs font-mono text-gray-500 mt-1">{editingUser.email}</p>
+              </div>
+              <button onClick={() => setEditingUser(null)} className="text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-red-600 dark:text-red-400 mb-2">Clearance Role</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 focus:border-red-500 rounded-lg py-3 px-4 text-gray-900 dark:text-white outline-none cursor-pointer"
+                >
+                  <option value="user">Standard User (Free)</option>
+                  <option value="pro">Pro Tier</option>
+                  <option value="admin">Admin (Full Access)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">Standard Limits</label>
+                  <input
+                    type="number" min="0"
+                    value={editStandard} onChange={(e) => setEditStandard(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 focus:border-red-500 rounded-lg py-3 px-4 text-gray-900 dark:text-white font-mono outline-none"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 dark:text-gray-400 mb-2">AI Limits</label>
+                  <input
+                    type="number" min="0"
+                    value={editAi} onChange={(e) => setEditAi(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-black border border-gray-300 dark:border-gray-700 focus:border-red-500 rounded-lg py-3 px-4 text-gray-900 dark:text-white font-mono outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 dark:bg-black/40 border-t border-gray-200 dark:border-gray-800 flex justify-between items-center gap-3 min-h-[80px]">
+              {showDeleteConfirm ? (
+                <div className="w-full flex items-center justify-between bg-red-500/10 border border-red-500/30 p-3 rounded-lg animate-in fade-in zoom-in duration-200">
+                  <span className="text-sm font-bold text-red-600 dark:text-red-500 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4" /> Confirm Deletion?
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm font-bold transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleDeleteUser} disabled={isDeleting} className="px-4 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50">
+                      {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      <span>Yes, Delete</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeleting || editingUser.id === user.id}
+                    className="p-2.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
+                    title="Ban / Delete User"
+                  >
+                    {isDeleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                  </button>
+
+                  <div className="flex gap-3">
+                    <button onClick={() => { setEditingUser(null); setShowDeleteConfirm(false); }} className="px-5 py-2.5 rounded-lg font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors text-sm">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveUpdate}
+                      disabled={isSaving}
+                      className="px-5 py-2.5 rounded-lg font-bold text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 transition-colors disabled:opacity-50 text-sm shadow-md dark:shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+                    >
+                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      <span>Execute Override</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="openclaw-ui/src/components/settings/SettingsDashboard.jsx">
+import React, { useState, useEffect } from 'react';
+import { User, CreditCard, Zap, Calendar, Link as LinkIcon, Save, Loader2, Shield } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+// 👈 1. Accept the new props from App.jsx
+export default function SettingsDashboard({ user, profile, setProfile, loading }) {
+
+  // 👈 2. We only need local state for the input box and the save button
+  const [sadapayLink, setSadapayLink] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 👈 3. Sync the input box with the cached profile data when it arrives
+  useEffect(() => {
+    if (profile) {
+      setSadapayLink(profile.default_sadapay || '');
+    }
+  }, [profile]);
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE}/api/user/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          sadapay_link: sadapayLink
+        })
+      });
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        toast.success('Settings saved successfully!');
+        // 👈 4. Instantly update the global cache so the UI reflects the change!
+        setProfile(prev => ({ ...prev, default_sadapay: sadapayLink }));
+      } else {
+        toast.error('Failed to save settings.');
+      }
+    } catch (error) {
+      toast.error('Network error saving settings.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-gray-400 min-h-[500px]">
+        <Loader2 className="w-12 h-12 animate-spin text-purple-500 mb-4" />
+        <p className="font-bold tracking-widest uppercase">Loading Profile...</p>
+      </div>
+    );
+  }
+
+  const resetDate = profile?.last_reset_date ? new Date(profile.last_reset_date) : new Date();
+  resetDate.setDate(resetDate.getDate() + 3);
+  const formattedDate = resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+
+      {/* HEADER */}
+      <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center space-x-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-white font-black text-2xl shadow-lg">
+            {user?.email?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">{user?.user_metadata?.full_name || 'Clarion User'}</h2>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">{user?.email}</p>
+          </div>
+
+          <div className="ml-auto">
+            <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border flex items-center gap-2 shadow-sm
+              ${profile?.role === 'admin' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                profile?.role === 'pro' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
+                'bg-gray-500/10 text-gray-400 border-gray-500/20'}`}>
+              {profile?.role === 'admin' && <Shield className="w-3 h-3" />}
+              {(!profile?.role || String(profile.role).toLowerCase() === 'user') ? 'Free' : profile.role} Plan
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* CREDITS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-4 text-purple-600 dark:text-purple-400">
+            <CreditCard className="w-5 h-5" />
+            <h3 className="font-bold tracking-wide uppercase text-sm">Standard Searches</h3>
+          </div>
+          <div className="text-4xl font-black text-gray-900 dark:text-white">{profile?.standard_credits}</div>
+        </div>
+
+        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-4 text-blue-600 dark:text-blue-400">
+            <Zap className="w-5 h-5" />
+            <h3 className="font-bold tracking-wide uppercase text-sm">AI Pitches</h3>
+          </div>
+          <div className="text-4xl font-black text-gray-900 dark:text-white">{profile?.ai_credits}</div>
+        </div>
+
+        <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div className="flex items-center gap-3 mb-4 text-green-600 dark:text-green-400">
+            <Calendar className="w-5 h-5" />
+            <h3 className="font-bold tracking-wide uppercase text-sm">Next Refill</h3>
+          </div>
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{formattedDate}</div>
+        </div>
+      </div>
+
+      {/* PREFERENCES FORM */}
+      <div className="bg-white/80 dark:bg-gray-900/40 backdrop-blur-xl border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-xl">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+          <User className="w-5 h-5 text-purple-500" /> Default Preferences
+        </h3>
+        <form onSubmit={handleSaveSettings} className="max-w-xl space-y-5">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Default Payment Link</label>
+            <div className="relative">
+              <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+              <input
+                type="text"
+                value={sadapayLink}
+                onChange={(e) => setSadapayLink(e.target.value)}
+                placeholder="https://sadapay.pk/..."
+                className="w-full bg-gray-50 dark:bg-black/50 border border-gray-300 dark:border-gray-700 focus:border-purple-500 dark:focus:border-purple-500 rounded-lg py-3 pl-10 pr-3 text-gray-900 dark:text-white text-sm outline-none transition-colors"
+              />
+            </div>
+            <p className="mt-2 text-xs text-gray-500">This link will automatically be applied to all your AI pitches.</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
+            <span>Save Preferences</span>
+          </button>
+        </form>
+      </div>
+
+    </div>
+  );
+}
+</file>
+
 <file path="backend_api/api.py">
 import os
 import uvicorn
@@ -2177,224 +2605,6 @@ def get_history(user_id: str): # 👈 NEW: Catches the ?user_id= query parameter
 if __name__ == "__main__":
     print("🚀 Clarion Backend API Initializing on Port 8000...")
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
-</file>
-
-<file path="openclaw-ui/src/components/auth/AuthScreen.jsx">
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
-import { Zap, Mail, Lock, Loader2, ShieldCheck, ArrowLeft, User } from 'lucide-react';
-import toast from 'react-hot-toast';
-
-export default function AuthScreen() {
-  // --- Form State ---
-  const [isLogin, setIsLogin] = useState(true);
-  const [showOtp, setShowOtp] = useState(false);
-  
-  // --- Input State ---
-  const [fullName, setFullName] = useState(''); // 👈 New Full Name state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
-  
-  // --- UI State ---
-  const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 👈 300 seconds = 5 minutes
-
-  // --- OTP Countdown Timer Logic ---
-  useEffect(() => {
-    let timer;
-    if (showOtp && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer); // Cleanup on unmount
-  }, [showOtp, timeLeft]);
-
-  // Format time to MM:SS
-  const formattedTime = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
-
-  // --- 1. Main Auth Handler ---
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const cleanEmail = email.trim(); 
-
-    try {
-      if (isLogin) {
-        // LOGIN
-        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-        if (error) throw error;
-        toast.success('Welcome back!');
-      } else {
-        // REGISTRATION (Now passing the Full Name to the database)
-        const { data, error } = await supabase.auth.signUp({ 
-          email: cleanEmail, 
-          password,
-          options: {
-            data: {
-              full_name: fullName // 👈 Supabase automatically saves this in user_metadata
-            }
-          }
-        });
-        if (error) throw error;
-        
-        if (data?.user && !data?.session) {
-          toast.success("Verification code sent to your inbox!");
-          setShowOtp(true);
-          setTimeLeft(300); // Reset timer to 5 minutes
-        } else {
-          toast.success("Account created successfully!");
-        }
-      }
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- 2. OTP Verification Handler ---
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    
-    if (timeLeft === 0) {
-      toast.error("This code has expired. Please register again to get a new code.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: otp,
-        type: 'signup'
-      });
-
-      if (error) throw error;
-      toast.success("Email verified! Access granted.");
-    } catch (error) {
-      toast.error("Invalid code. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0F19] p-4 text-gray-200 w-full">
-      <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl p-8">
-        
-        {/* LOGO */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-purple-600/20 rounded-xl mb-4">
-            <Zap className="w-8 h-8 text-purple-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white tracking-widest uppercase">Clarion</h1>
-          <p className="text-sm font-mono text-gray-400 mt-1">Lead Generation Platform</p>
-        </div>
-
-        {/* --- CONDITIONALLY RENDER OTP OR AUTH FORM --- */}
-        {showOtp ? (
-          
-          /* OTP VERIFICATION UI */
-          <div className="animate-in fade-in zoom-in duration-300">
-            <h2 className="text-xl font-bold text-white mb-2 text-center">Verify Email</h2>
-            
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6 text-center">
-              <p className="text-sm text-gray-300 mb-1">Code sent securely to:</p>
-              <p className="text-purple-400 font-mono font-bold">{email}</p>
-            </div>
-
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold uppercase tracking-wide text-gray-400">8-Digit Code</label>
-                  <span className={`text-xs font-mono font-bold ${timeLeft < 60 ? 'text-red-400' : 'text-gray-400'}`}>
-                    Expires in: {formattedTime}
-                  </span>
-                </div>
-                
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="text" required maxLength="8" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} 
-                    disabled={timeLeft === 0}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-3 pl-10 pr-4 text-white text-center tracking-[0.5em] font-bold text-xl outline-none transition-colors disabled:opacity-50"
-                    placeholder="••••••••" />
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading || timeLeft === 0 || otp.length < 8} 
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Confirm Registration</span>}
-              </button>
-            </form>
-
-            <button onClick={() => {setShowOtp(false); setTimeLeft(300);}} className="w-full mt-4 text-sm text-gray-500 hover:text-white flex items-center justify-center gap-2 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Return to Login
-            </button>
-          </div>
-
-        ) : (
-
-          /* STANDARD LOGIN/REGISTER UI */
-          <div className="animate-in fade-in duration-300">
-            <h2 className="text-xl font-bold text-white mb-6 text-center">
-              {isLogin ? 'Welcome Back' : 'Create an Account'}
-            </h2>
-
-            <form onSubmit={handleAuth} className="space-y-5">
-              
-              {/* 👈 NEW FULL NAME FIELD (Only shows during Sign Up) */}
-              {!isLogin && (
-                <div className="animate-in slide-in-from-top-2 duration-300">
-                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                      placeholder="John Doe" />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                    placeholder="you@company.com" />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="password" required minLength="6" value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                    placeholder="••••••••" />
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>{isLogin ? 'Sign In' : 'Register Now'}</span>}
-              </button>
-            </form>
-
-            <div className="mt-6 text-center text-sm text-gray-400">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-purple-400 hover:text-purple-300 font-bold transition-colors underline">
-                {isLogin ? 'Sign up here' : 'Log in here'}
-              </button>
-            </div>
-          </div>
-        )}
-        
-      </div>
-    </div>
-  );
-}
 </file>
 
 <file path="openclaw-ui/src/components/generator/MapModal.jsx">
@@ -2638,12 +2848,237 @@ export default function MapModal({ isOpen, onClose, onConfirm }) {
 }
 </file>
 
+<file path="openclaw-ui/src/components/auth/AuthScreen.jsx">
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
+import { Zap, Mail, Lock, Loader2, ShieldCheck, ArrowLeft, User } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export default function AuthScreen() {
+  // --- Form State ---
+  const [isLogin, setIsLogin] = useState(true);
+  const [showOtp, setShowOtp] = useState(false);
+  
+  // --- Input State ---
+  const [fullName, setFullName] = useState(''); // 👈 New Full Name state
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  
+  // --- UI State ---
+  const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(300); // 👈 300 seconds = 5 minutes
+
+  // --- OTP Countdown Timer Logic ---
+  useEffect(() => {
+    let timer;
+    if (showOtp && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer); // Cleanup on unmount
+  }, [showOtp, timeLeft]);
+
+  // Format time to MM:SS
+  const formattedTime = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+
+  // --- 1. Main Auth Handler ---
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const cleanEmail = email.trim(); 
+
+    // 🚨 STRICT DOMAIN LOCK: Only allow @gmail.com during Registration
+    if (!isLogin && !cleanEmail.toLowerCase().endsWith('@gmail.com')) {
+      toast.error("Registration is currently restricted to @gmail.com accounts only.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (isLogin) {
+        // LOGIN
+        const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+        if (error) throw error;
+        toast.success('Welcome back!');
+      } else {
+        // REGISTRATION (Now passing the Full Name to the database)
+        const { data, error } = await supabase.auth.signUp({ 
+          email: cleanEmail, 
+          password,
+          options: {
+            data: {
+              full_name: fullName // 👈 Supabase automatically saves this in user_metadata
+            }
+          }
+        });
+        if (error) throw error;
+        
+        if (data?.user && !data?.session) {
+          toast.success("Verification code sent to your inbox!");
+          setShowOtp(true);
+          setTimeLeft(300); // Reset timer to 5 minutes
+        } else {
+          toast.success("Account created successfully!");
+        }
+      }
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 2. OTP Verification Handler ---
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    
+    if (timeLeft === 0) {
+      toast.error("This code has expired. Please register again to get a new code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: otp,
+        type: 'signup'
+      });
+
+      if (error) throw error;
+      toast.success("Email verified! Access granted.");
+    } catch (error) {
+      toast.error("Invalid code. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0B0F19] p-4 text-gray-200 w-full">
+      <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl p-8">
+        
+        {/* LOGO */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center p-3 bg-purple-600/20 rounded-xl mb-4">
+            <Zap className="w-8 h-8 text-purple-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-widest uppercase">Clarion</h1>
+          <p className="text-sm font-mono text-gray-400 mt-1">Lead Generation Platform</p>
+        </div>
+
+        {/* --- CONDITIONALLY RENDER OTP OR AUTH FORM --- */}
+        {showOtp ? (
+          
+          /* OTP VERIFICATION UI */
+          <div className="animate-in fade-in zoom-in duration-300">
+            <h2 className="text-xl font-bold text-white mb-2 text-center">Verify Email</h2>
+            
+            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6 text-center">
+              <p className="text-sm text-gray-300 mb-1">Code sent securely to:</p>
+              <p className="text-purple-400 font-mono font-bold">{email}</p>
+            </div>
+
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold uppercase tracking-wide text-gray-400">8-Digit Code</label>
+                  <span className={`text-xs font-mono font-bold ${timeLeft < 60 ? 'text-red-400' : 'text-gray-400'}`}>
+                    Expires in: {formattedTime}
+                  </span>
+                </div>
+                
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input type="text" required maxLength="8" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} 
+                    disabled={timeLeft === 0}
+                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-3 pl-10 pr-4 text-white text-center tracking-[0.5em] font-bold text-xl outline-none transition-colors disabled:opacity-50"
+                    placeholder="••••••••" />
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading || timeLeft === 0 || otp.length < 8} 
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Confirm Registration</span>}
+              </button>
+            </form>
+
+            <button onClick={() => {setShowOtp(false); setTimeLeft(300);}} className="w-full mt-4 text-sm text-gray-500 hover:text-white flex items-center justify-center gap-2 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Return to Login
+            </button>
+          </div>
+
+        ) : (
+
+          /* STANDARD LOGIN/REGISTER UI */
+          <div className="animate-in fade-in duration-300">
+            <h2 className="text-xl font-bold text-white mb-6 text-center">
+              {isLogin ? 'Welcome Back' : 'Create an Account'}
+            </h2>
+
+            <form onSubmit={handleAuth} className="space-y-5">
+              
+              {/* 👈 NEW FULL NAME FIELD (Only shows during Sign Up) */}
+              {!isLogin && (
+                <div className="animate-in slide-in-from-top-2 duration-300">
+                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                    <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)}
+                      className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
+                      placeholder="John Doe" />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
+                    placeholder="you@company.com" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input type="password" required minLength="6" value={password} onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
+                    placeholder="••••••••" />
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>{isLogin ? 'Sign In' : 'Register Now'}</span>}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center text-sm text-gray-400">
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-purple-400 hover:text-purple-300 font-bold transition-colors underline">
+                {isLogin ? 'Sign up here' : 'Log in here'}
+              </button>
+            </div>
+          </div>
+        )}
+        
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="openclaw-ui/src/components/layout/Navbar.jsx">
 import React, { useEffect, useState } from 'react';
-import { Sun, Moon, Search, Users, Menu, X, LogOut, User } from 'lucide-react';
+import { Sun, Moon, Search, Users, Menu, X, LogOut, User, ShieldAlert } from 'lucide-react';
 
 // 👈 NEW: Added isGenerating to the props
-export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, isGenerating }) {
+export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, onLogout, user, profile, isGenerating }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const fullName = user?.user_metadata?.full_name;
@@ -2722,6 +3157,22 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
               <User className="w-4 h-4" /> {/* Make sure to import User from lucide-react at the top! */}
               <span>Settings</span>
             </button>
+
+            {/* ADMIN COMMAND CENTER (Only visible to Admins) */}
+            {profile?.role === 'admin' && (
+              <button
+                disabled={isGenerating}
+                onClick={() => handleTabChange('admin')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                  activeTab === 'admin'
+                    ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                    : 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <ShieldAlert className="w-4 h-4" />
+                <span>Command Center</span>
+              </button>
+            )}
 
             <button
               disabled={isGenerating}
@@ -2833,6 +3284,22 @@ export default function Navbar({ isDark, toggleTheme, activeTab, setActiveTab, o
                       <span>Settings</span>
                     </button>
 
+                    {/* ADMIN COMMAND CENTER (Only visible to Admins) */}
+                    {profile?.role === 'admin' && (
+                      <button
+                        disabled={isGenerating}
+                        onClick={() => handleTabChange('admin')}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md font-bold text-sm transition-all ${
+                          activeTab === 'admin'
+                            ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.5)]'
+                            : 'text-red-500 hover:text-red-400 hover:bg-red-500/10'
+                        } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                        <span>Command Center</span>
+                      </button>
+                    )}
+
                     <button
                       disabled={isGenerating}
                       onClick={() => handleTabChange('vault')}
@@ -2892,7 +3359,11 @@ from validators import validate_inputs
 from scraper import run_scraper
 
 # Supabase database imports
-from database import save_leads_to_db, get_user_vault, delete_user_leads, update_lead_pitch, check_and_eval_credits, deduct_user_credits, get_user_profile, update_user_settings
+from database import (
+    supabase, save_leads_to_db, get_user_vault, delete_user_leads,
+    update_lead_pitch, check_and_eval_credits, deduct_user_credits,
+    get_user_profile, update_user_settings, get_all_profiles, update_user_tier # 👈 Added the new functions
+)
 
 app = FastAPI(title="Clarion API", version="2.0")
 
@@ -2930,6 +3401,17 @@ class UpdatePitchRequest(BaseModel):
 class SettingsRequest(BaseModel):
     user_id: str
     sadapay_link: str
+
+class AdminUpdateRequest(BaseModel):
+    requester_id: str
+    target_user_id: str
+    new_role: str
+    standard_credits: int
+    ai_credits: int
+
+class AdminDeleteRequest(BaseModel):
+    requester_id: str
+    target_user_id: str
 
 # --- THE BACKGROUND WORKER ---
 def background_scraper_task(task_id: str, request: LeadRequest, clean_data: dict):
@@ -3100,264 +3582,58 @@ def save_settings(request: SettingsRequest):
     return {"status": "error", "message": "Failed to save settings."}
 
 
+# --- ADMIN COMMAND PANEL ENDPOINTS ---
+
+@app.get("/api/admin/users")
+def get_all_users(requester_id: str):
+    print(f"\n[!] ADMIN PROTOCOL: Fetch requested by ID {requester_id}")
+
+    success, data = get_all_profiles(requester_id)
+
+    if success:
+        return {"status": "success", "data": data}
+    else:
+        return {"status": "error", "message": data}  # Contains the unauthorized error message
+
+
+@app.post("/api/admin/users/update")
+def update_user(request: AdminUpdateRequest):
+    print(f"\n[!] ADMIN PROTOCOL: Update requested by {request.requester_id} for target {request.target_user_id}")
+
+    success, message = update_user_tier(
+        request.requester_id,
+        request.target_user_id,
+        request.new_role,
+        request.standard_credits,
+        request.ai_credits
+    )
+
+    if success:
+        return {"status": "success", "message": message}
+    else:
+        return {"status": "error", "message": message}
+
+
+@app.post("/api/admin/users/delete")
+def delete_user_account(request: AdminDeleteRequest):
+    print(f"\n[!] ADMIN PROTOCOL: Deletion requested by {request.requester_id} for target {request.target_user_id}")
+
+    # 1. Verify admin clearance
+    requester_profile = get_user_profile(request.requester_id)
+    if not requester_profile or requester_profile.get('role') != 'admin':
+        return {"status": "error", "message": "Unauthorized access."}
+
+    try:
+        # 2. Hard delete the user from auth.users (Supabase cascades this deletion to profiles)
+        response = supabase.auth.admin.delete_user(request.target_user_id)
+        return {"status": "success", "message": "User permanently deleted."}
+    except Exception as e:
+        print(f"[-] Admin Delete Error: {e}")
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
     print("🚀 Clarion Backend API Initializing on Port 8000...")
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
-</file>
-
-<file path="hf-space/database.py">
-import os
-from dotenv import load_dotenv
-from supabase import create_client, Client
-from typing import List
-from datetime import datetime, timezone, timedelta
-
-load_dotenv()
-
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_SERVICE_KEY")
-
-if not url or not key:
-    raise ValueError("CRITICAL ERROR: Supabase credentials missing in .env file.")
-
-supabase: Client = create_client(url, key)
-
-
-def save_leads_to_db(city: str, category: str, leads: list, user_id: str):
-    saved_count = 0
-
-    # 👈 NEW: Extract the real city name generated by the Reverse Geocoder!
-    if city.startswith("coords:"):
-        parts = city.split(",")
-        # If the string has the 4th parameter (the city name), use it! Otherwise fallback.
-        clean_city_name = parts[3].upper() if len(parts) > 3 else "MAP AREA"
-    else:
-        clean_city_name = city.upper()
-
-    for lead in leads:
-        whatsapp = lead.get('WhatsApp Link', '')
-        if not whatsapp or whatsapp == 'N/A':
-            continue
-
-        try:
-            master_data = {
-                "city": clean_city_name,
-                "category": category.upper(),
-                "business_name": lead.get('Business Name', 'Unknown'),
-                "review_count": lead.get('Review Count', 0),
-                "website_status": lead.get('Website Faults', 'N/A'),
-                "whatsapp_link": whatsapp,
-                "ai_strength": lead.get('AI Strength', 'N/A'),
-                "ai_weakness": lead.get('AI Weakness', 'N/A'),
-                "pitch": lead.get('Pitch', '')
-            }
-
-            master_response = supabase.table("master_leads").upsert(master_data, on_conflict="whatsapp_link").execute()
-            lead_id = master_response.data[0]['id']
-
-            link_data = {
-                "user_id": user_id,
-                "lead_id": lead_id
-            }
-            supabase.table("user_unlocked_leads").upsert(link_data, on_conflict="user_id, lead_id").execute()
-            saved_count += 1
-
-        except Exception as e:
-            print(f"[-] DB Link Error: {e}")
-            continue
-
-    print(f"[+] DATABASE: Successfully routed {saved_count} leads to User {user_id}'s Vault.")
-    return saved_count
-
-
-def get_user_vault(user_id: str):
-    """Fetches leads from Supabase and formats the keys."""
-    try:
-        response = supabase.table('user_unlocked_leads') \
-            .select('unlocked_at, master_leads(*)') \
-            .eq('user_id', user_id) \
-            .order('unlocked_at', desc=True) \
-            .execute()
-
-        formatted_leads = []
-        for item in response.data:
-            db_lead = item.get('master_leads') or {}
-
-            raw_date = item.get('unlocked_at')
-            clean_date = raw_date.split('T')[0] if raw_date else "Recent"
-
-            formatted_leads.append({
-                "Business Name": db_lead.get("business_name") or "Unknown",
-                "WhatsApp Link": db_lead.get("whatsapp_link") or "N/A",
-                "Website Link": "N/A",
-                "Review Count": db_lead.get("review_count") or 0,
-                "Website Faults": db_lead.get("website_status") or "N/A",
-                "AI Strength": db_lead.get("ai_strength") or "N/A",
-                "AI Weakness": db_lead.get("ai_weakness") or "N/A",
-                "Pitch": db_lead.get("pitch") or "No pitch generated.",
-                "City": db_lead.get("city") or "Unknown",
-                "Category": db_lead.get("category") or "Unknown",
-                "date_scraped": clean_date
-            })
-
-        return formatted_leads
-
-    except Exception as e:
-        print(f"[-] Vault Retrieval Error: {e}")
-        return []
-
-
-def delete_user_leads(user_id: str, whatsapp_links: List[str]):
-    """
-    BULK DELETE: Severs the link between a user and multiple leads efficiently.
-    """
-    try:
-        # Step 1: Look up all global Lead IDs matching the array of WhatsApp links
-        # Using .in_() is much faster than looping!
-        lead_response = supabase.table('master_leads').select('id').in_('whatsapp_link', whatsapp_links).execute()
-
-        if not lead_response.data:
-            print("[-] Delete Error: None of those WhatsApp links were found in master_leads.")
-            return False, 0
-
-        # Extract just the ID numbers into a list: [14, 25, 88]
-        lead_ids = [item['id'] for item in lead_response.data]
-
-        # Step 2: Delete all mapping links for this user that match those IDs
-        delete_response = supabase.table('user_unlocked_leads') \
-            .delete() \
-            .eq('user_id', user_id) \
-            .in_('lead_id', lead_ids) \
-            .execute()
-
-        # Optional: Check how many were actually deleted
-        deleted_count = len(delete_response.data) if delete_response.data else len(lead_ids)
-        print(f"[+] Bulk Delete Success: Removed {deleted_count} links from user vault.")
-
-        return True, deleted_count
-
-    except Exception as e:
-        print(f"[-] Bulk Delete Error: {e}")
-        return False, 0
-
-
-def update_lead_pitch(whatsapp_link: str, new_pitch: str):
-    """
-    Allows a user to manually edit and save the AI-generated pitch.
-    """
-    try:
-        response = supabase.table('master_leads') \
-            .update({'pitch': new_pitch}) \
-            .eq('whatsapp_link', whatsapp_link) \
-            .execute()
-
-        # Check if the update actually found a row to modify
-        if response.data:
-            return True
-        return False
-    except Exception as e:
-        print(f"[-] Pitch Update Error: {e}")
-        return False
-
-
-def get_user_profile(user_id: str):
-    """
-    Fetches the user's profile, tier, and credit balances.
-    """
-    try:
-        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
-        if response.data:
-            return response.data[0]
-        return None
-    except Exception as e:
-        print(f"[-] Profile Fetch Error: {e}")
-        return None
-
-
-def deduct_user_credits(user_id: str, leads_found: int, used_ai: bool):
-    """
-    Safely subtracts credits from the user's balance after a successful scrape.
-    """
-    try:
-        # 1. Fetch current balances
-        profile = get_user_profile(user_id)
-        if not profile:
-            return False
-
-        new_standard = max(0, profile['standard_credits'] - leads_found)
-
-        # 2. Prepare the update payload
-        update_data = {"standard_credits": new_standard}
-
-        # 3. Only deduct AI credits if they actually used the AI feature
-        if used_ai:
-            update_data["ai_credits"] = max(0, profile['ai_credits'] - leads_found)
-
-        # 4. Save the new balances to the database
-        supabase.table('profiles').update(update_data).eq('id', user_id).execute()
-
-        print(f"[+] DATABASE: Deducted {leads_found} credits from User {user_id}.")
-        return True
-
-    except Exception as e:
-        print(f"[-] Credit Deduction Error: {e}")
-        return False
-
-def check_and_eval_credits(user_id: str):
-    """
-    Evaluates the 3-day (72-hour) reset rule using strict server UTC time.
-    Replenishes allowances according to the user's assigned tier profile.
-    """
-    try:
-        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
-        if not response.data:
-            return None
-
-        profile = response.data[0]
-        # Parse the timestamp cleanly regardless of format trailing variants
-        last_reset_str = profile['last_reset_date'].replace('Z', '+00:00')
-        last_reset = datetime.fromisoformat(last_reset_str)
-        now = datetime.now(timezone.utc)
-
-        # Check if 72 hours have fully elapsed
-        if now - last_reset >= timedelta(days=3):
-            role = profile.get('role', 'user')
-
-            # Tier-based limitation allocation
-            if role == 'admin':
-                standard_limit = 9999
-                ai_limit = 9999
-            elif role == 'pro':
-                standard_limit = 500
-                ai_limit = 100
-            else:  # standard default user tier
-                standard_limit = 50
-                ai_limit = 10
-
-            update_payload = {
-                "standard_credits": standard_limit,
-                "ai_credits": ai_limit,
-                "last_reset_date": now.isoformat()
-            }
-
-            reset_response = supabase.table('profiles').update(update_payload).eq('id', user_id).execute()
-            if reset_response.data:
-                return reset_response.data[0]
-
-        return profile
-    except Exception as e:
-        print(f"[-] Security Balance Reset Evaluation Error: {e}")
-        return None
-
-
-def update_user_settings(user_id: str, sadapay_link: str):
-    """Saves the user's custom settings."""
-    try:
-        supabase.table('profiles').update({'default_sadapay': sadapay_link}).eq('id', user_id).execute()
-        return True
-    except Exception as e:
-        print(f"[-] Settings Update Error: {e}")
-        return False
 </file>
 
 <file path="openclaw-ui/src/components/generator/LeadForm.jsx">
@@ -4212,6 +4488,312 @@ export default function HistoryDashboard({ user, history, setHistory, loading })
 }
 </file>
 
+<file path="hf-space/database.py">
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from typing import List
+from datetime import datetime, timezone, timedelta
+
+load_dotenv()
+
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_SERVICE_KEY")
+
+if not url or not key:
+    raise ValueError("CRITICAL ERROR: Supabase credentials missing in .env file.")
+
+supabase: Client = create_client(url, key)
+
+
+def save_leads_to_db(city: str, category: str, leads: list, user_id: str):
+    saved_count = 0
+
+    # 👈 NEW: Extract the real city name generated by the Reverse Geocoder!
+    if city.startswith("coords:"):
+        parts = city.split(",")
+        # If the string has the 4th parameter (the city name), use it! Otherwise fallback.
+        clean_city_name = parts[3].upper() if len(parts) > 3 else "MAP AREA"
+    else:
+        clean_city_name = city.upper()
+
+    for lead in leads:
+        whatsapp = lead.get('WhatsApp Link', '')
+        if not whatsapp or whatsapp == 'N/A':
+            continue
+
+        try:
+            master_data = {
+                "city": clean_city_name,
+                "category": category.upper(),
+                "business_name": lead.get('Business Name', 'Unknown'),
+                "review_count": lead.get('Review Count', 0),
+                "website_status": lead.get('Website Faults', 'N/A'),
+                "whatsapp_link": whatsapp,
+                "ai_strength": lead.get('AI Strength', 'N/A'),
+                "ai_weakness": lead.get('AI Weakness', 'N/A'),
+                "pitch": lead.get('Pitch', '')
+            }
+
+            master_response = supabase.table("master_leads").upsert(master_data, on_conflict="whatsapp_link").execute()
+            lead_id = master_response.data[0]['id']
+
+            link_data = {
+                "user_id": user_id,
+                "lead_id": lead_id
+            }
+            supabase.table("user_unlocked_leads").upsert(link_data, on_conflict="user_id, lead_id").execute()
+            saved_count += 1
+
+        except Exception as e:
+            print(f"[-] DB Link Error: {e}")
+            continue
+
+    print(f"[+] DATABASE: Successfully routed {saved_count} leads to User {user_id}'s Vault.")
+    return saved_count
+
+
+def get_user_vault(user_id: str):
+    """Fetches leads from Supabase and formats the keys."""
+    try:
+        response = supabase.table('user_unlocked_leads') \
+            .select('unlocked_at, master_leads(*)') \
+            .eq('user_id', user_id) \
+            .order('unlocked_at', desc=True) \
+            .execute()
+
+        formatted_leads = []
+        for item in response.data:
+            db_lead = item.get('master_leads') or {}
+
+            raw_date = item.get('unlocked_at')
+            clean_date = raw_date.split('T')[0] if raw_date else "Recent"
+
+            formatted_leads.append({
+                "Business Name": db_lead.get("business_name") or "Unknown",
+                "WhatsApp Link": db_lead.get("whatsapp_link") or "N/A",
+                "Website Link": "N/A",
+                "Review Count": db_lead.get("review_count") or 0,
+                "Website Faults": db_lead.get("website_status") or "N/A",
+                "AI Strength": db_lead.get("ai_strength") or "N/A",
+                "AI Weakness": db_lead.get("ai_weakness") or "N/A",
+                "Pitch": db_lead.get("pitch") or "No pitch generated.",
+                "City": db_lead.get("city") or "Unknown",
+                "Category": db_lead.get("category") or "Unknown",
+                "date_scraped": clean_date
+            })
+
+        return formatted_leads
+
+    except Exception as e:
+        print(f"[-] Vault Retrieval Error: {e}")
+        return []
+
+
+def delete_user_leads(user_id: str, whatsapp_links: List[str]):
+    """
+    BULK DELETE: Severs the link between a user and multiple leads efficiently.
+    """
+    try:
+        # Step 1: Look up all global Lead IDs matching the array of WhatsApp links
+        # Using .in_() is much faster than looping!
+        lead_response = supabase.table('master_leads').select('id').in_('whatsapp_link', whatsapp_links).execute()
+
+        if not lead_response.data:
+            print("[-] Delete Error: None of those WhatsApp links were found in master_leads.")
+            return False, 0
+
+        # Extract just the ID numbers into a list: [14, 25, 88]
+        lead_ids = [item['id'] for item in lead_response.data]
+
+        # Step 2: Delete all mapping links for this user that match those IDs
+        delete_response = supabase.table('user_unlocked_leads') \
+            .delete() \
+            .eq('user_id', user_id) \
+            .in_('lead_id', lead_ids) \
+            .execute()
+
+        # Optional: Check how many were actually deleted
+        deleted_count = len(delete_response.data) if delete_response.data else len(lead_ids)
+        print(f"[+] Bulk Delete Success: Removed {deleted_count} links from user vault.")
+
+        return True, deleted_count
+
+    except Exception as e:
+        print(f"[-] Bulk Delete Error: {e}")
+        return False, 0
+
+
+def update_lead_pitch(whatsapp_link: str, new_pitch: str):
+    """
+    Allows a user to manually edit and save the AI-generated pitch.
+    """
+    try:
+        response = supabase.table('master_leads') \
+            .update({'pitch': new_pitch}) \
+            .eq('whatsapp_link', whatsapp_link) \
+            .execute()
+
+        # Check if the update actually found a row to modify
+        if response.data:
+            return True
+        return False
+    except Exception as e:
+        print(f"[-] Pitch Update Error: {e}")
+        return False
+
+
+def get_user_profile(user_id: str):
+    """
+    Fetches the user's profile, tier, and credit balances.
+    """
+    try:
+        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
+        if response.data:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"[-] Profile Fetch Error: {e}")
+        return None
+
+
+def deduct_user_credits(user_id: str, leads_found: int, used_ai: bool):
+    """
+    Safely subtracts credits from the user's balance after a successful scrape.
+    """
+    try:
+        # 1. Fetch current balances
+        profile = get_user_profile(user_id)
+        if not profile:
+            return False
+
+        new_standard = max(0, profile['standard_credits'] - leads_found)
+
+        # 2. Prepare the update payload
+        update_data = {"standard_credits": new_standard}
+
+        # 3. Only deduct AI credits if they actually used the AI feature
+        if used_ai:
+            update_data["ai_credits"] = max(0, profile['ai_credits'] - leads_found)
+
+        # 4. Save the new balances to the database
+        supabase.table('profiles').update(update_data).eq('id', user_id).execute()
+
+        print(f"[+] DATABASE: Deducted {leads_found} credits from User {user_id}.")
+        return True
+
+    except Exception as e:
+        print(f"[-] Credit Deduction Error: {e}")
+        return False
+
+def check_and_eval_credits(user_id: str):
+    """
+    Evaluates the 3-day (72-hour) reset rule using strict server UTC time.
+    Replenishes allowances according to the user's assigned tier profile.
+    """
+    try:
+        response = supabase.table('profiles').select('*').eq('id', user_id).execute()
+        if not response.data:
+            return None
+
+        profile = response.data[0]
+        # Parse the timestamp cleanly regardless of format trailing variants
+        last_reset_str = profile['last_reset_date'].replace('Z', '+00:00')
+        last_reset = datetime.fromisoformat(last_reset_str)
+        now = datetime.now(timezone.utc)
+
+        # Check if 72 hours have fully elapsed
+        if now - last_reset >= timedelta(days=3):
+            role = profile.get('role', 'user')
+
+            # Tier-based limitation allocation
+            if role == 'admin':
+                standard_limit = 9999
+                ai_limit = 9999
+            elif role == 'pro':
+                standard_limit = 500
+                ai_limit = 100
+            else:  # standard default user tier
+                standard_limit = 50
+                ai_limit = 10
+
+            update_payload = {
+                "standard_credits": standard_limit,
+                "ai_credits": ai_limit,
+                "last_reset_date": now.isoformat()
+            }
+
+            reset_response = supabase.table('profiles').update(update_payload).eq('id', user_id).execute()
+            if reset_response.data:
+                return reset_response.data[0]
+
+        return profile
+    except Exception as e:
+        print(f"[-] Security Balance Reset Evaluation Error: {e}")
+        return None
+
+
+def update_user_settings(user_id: str, sadapay_link: str):
+    """Saves the user's custom settings."""
+    try:
+        supabase.table('profiles').update({'default_sadapay': sadapay_link}).eq('id', user_id).execute()
+        return True
+    except Exception as e:
+        print(f"[-] Settings Update Error: {e}")
+        return False
+
+
+def get_all_profiles(requester_id: str):
+    """
+    Fetches all registered users from the vault, but ONLY if the requester
+    is verified as an admin in the database.
+    """
+    try:
+        # 1. Verify the requester's identity and clearance level
+        requester_profile = get_user_profile(requester_id)
+        if not requester_profile or requester_profile.get('role') != 'admin':
+            return False, "Unauthorized access. Admin clearance required."
+
+        # 2. Fetch all profiles if clearance is granted
+        response = supabase.table('profiles').select('*').order('created_at', desc=True).execute()
+        return True, response.data
+
+    except Exception as e:
+        print(f"[-] Admin Vault Retrieval Error: {e}")
+        return False, str(e)
+
+
+def update_user_tier(requester_id: str, target_user_id: str, new_role: str, standard_credits: int, ai_credits: int):
+    """
+    Allows an admin to modify another user's role and credit limits.
+    """
+    try:
+        # 1. Verify the requester's identity and clearance level
+        requester_profile = get_user_profile(requester_id)
+        if not requester_profile or requester_profile.get('role') != 'admin':
+            return False, "Unauthorized access. Admin clearance required."
+
+        # 2. Prepare the override payload
+        update_payload = {
+            "role": new_role,
+            "standard_credits": standard_credits,
+            "ai_credits": ai_credits
+        }
+
+        # 3. Execute the update on the target user
+        response = supabase.table('profiles').update(update_payload).eq('id', target_user_id).execute()
+
+        if response.data:
+            print(f"[+] ADMIN ACTION: User {target_user_id} upgraded to {new_role}.")
+            return True, "User updated successfully."
+
+        return False, "Target user not found or update failed."
+
+    except Exception as e:
+        print(f"[-] Admin Update Error: {e}")
+        return False, str(e)
+</file>
+
 <file path="openclaw-ui/src/App.jsx">
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabaseClient';
@@ -4225,6 +4807,8 @@ import LeadForm from './components/generator/LeadForm';
 import ResultsTable from './components/generator/ResultsTable';
 import Navbar from './components/layout/Navbar';
 import SettingsDashboard from './components/settings/SettingsDashboard';
+import AdminGuard from './components/auth/AdminGuard';
+import CommandCenter from './components/admin/CommandCenter';
 
 export default function App() {
   // --- State Management ---
@@ -4392,6 +4976,7 @@ export default function App() {
           setActiveTab={setActiveTab}
           onLogout={handleLogout}
           user={session?.user}
+          profile={userProfile}
           isGenerating={isGenerating}
         />
       </header>
@@ -4437,6 +5022,14 @@ export default function App() {
             loading={isProfileLoading}     // 👈 Pass the loading state
           />
         )}
+
+        {/* TAB 4: ADMIN COMMAND CENTER (SECURED) */}
+        {activeTab === 'admin' && (
+          <AdminGuard profile={userProfile} setActiveTab={setActiveTab}>
+             <CommandCenter user={session.user} />
+          </AdminGuard>
+        )}
+
       </main>
     </div>
   );
