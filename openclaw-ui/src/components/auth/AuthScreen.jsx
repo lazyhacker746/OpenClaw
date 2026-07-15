@@ -1,75 +1,90 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../supabaseClient';
-import { Zap, Mail, Lock, Loader2, ShieldCheck, ArrowLeft, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  MapPinned,
+  ShieldCheck,
+  Sparkles,
+  User,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '../../supabaseClient';
+import Logo from '../layout/Logo';
+
+const benefits = [
+  {
+    icon: MapPinned,
+    title: 'Local market targeting',
+    description: 'Search cities or precise map areas with review and website-quality filters.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Qualified lead intelligence',
+    description: 'Save structured opportunities, contact routes, and website findings in one Vault.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Pitch-ready outreach',
+    description: 'Turn local business context into editable, WhatsApp-ready messaging.',
+  },
+];
 
 export default function AuthScreen() {
-  // --- Form State ---
   const [isLogin, setIsLogin] = useState(true);
   const [showOtp, setShowOtp] = useState(false);
-  
-  // --- Input State ---
-  const [fullName, setFullName] = useState(''); // 👈 New Full Name state
+  const [showPassword, setShowPassword] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
-  
-  // --- UI State ---
   const [loading, setLoading] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(300); // 👈 300 seconds = 5 minutes
+  const [timeLeft, setTimeLeft] = useState(300);
 
-  // --- OTP Countdown Timer Logic ---
   useEffect(() => {
-    let timer;
-    if (showOtp && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer); // Cleanup on unmount
+    if (!showOtp || timeLeft <= 0) return undefined;
+    const timer = window.setInterval(() => setTimeLeft((current) => current - 1), 1000);
+    return () => window.clearInterval(timer);
   }, [showOtp, timeLeft]);
 
-  // Format time to MM:SS
-  const formattedTime = `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+  const formattedTime = `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`;
 
-  // --- 1. Main Auth Handler ---
-  const handleAuth = async (e) => {
-    e.preventDefault();
+  const handleAuth = async (event) => {
+    event.preventDefault();
     setLoading(true);
-    const cleanEmail = email.trim(); 
+    const cleanEmail = email.trim();
 
-    // 🚨 STRICT DOMAIN LOCK: Only allow @gmail.com during Registration
     if (!isLogin && !cleanEmail.toLowerCase().endsWith('@gmail.com')) {
-      toast.error("Registration is currently restricted to @gmail.com accounts only.");
+      toast.error('Registration is currently restricted to @gmail.com accounts.');
       setLoading(false);
       return;
     }
 
     try {
       if (isLogin) {
-        // LOGIN
         const { error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
         if (error) throw error;
-        toast.success('Welcome back!');
+        toast.success('Welcome back to Clarion.');
       } else {
-        // REGISTRATION (Now passing the Full Name to the database)
-        const { data, error } = await supabase.auth.signUp({ 
-          email: cleanEmail, 
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
           password,
-          options: {
-            data: {
-              full_name: fullName // 👈 Supabase automatically saves this in user_metadata
-            }
-          }
+          options: { data: { full_name: fullName.trim() } },
         });
         if (error) throw error;
-        
+
         if (data?.user && !data?.session) {
-          toast.success("Verification code sent to your inbox!");
+          toast.success('Verification code sent to your inbox.');
           setShowOtp(true);
-          setTimeLeft(300); // Reset timer to 5 minutes
+          setTimeLeft(300);
+          setOtp('');
         } else {
-          toast.success("Account created successfully!");
+          toast.success('Account created successfully.');
         }
       }
     } catch (error) {
@@ -79,12 +94,10 @@ export default function AuthScreen() {
     }
   };
 
-  // --- 2. OTP Verification Handler ---
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    
+  const handleVerifyOtp = async (event) => {
+    event.preventDefault();
     if (timeLeft === 0) {
-      toast.error("This code has expired. Please register again to get a new code.");
+      toast.error('This code has expired. Register again to receive a new code.');
       return;
     }
 
@@ -93,130 +106,242 @@ export default function AuthScreen() {
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp,
-        type: 'signup'
+        type: 'signup',
       });
-
       if (error) throw error;
-      toast.success("Email verified! Access granted.");
-    } catch (error) {
-      toast.error("Invalid code. Please try again.");
+      toast.success('Email verified. Your workspace is ready.');
+    } catch {
+      toast.error('The code is invalid. Check it and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0B0F19] p-4 text-gray-200 w-full">
-      <div className="max-w-md w-full bg-gray-900/50 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl p-8">
-        
-        {/* LOGO */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-purple-600/20 rounded-xl mb-4">
-            <Zap className="w-8 h-8 text-purple-500" />
+    <main className="clarion-app-shell grid min-h-dvh lg:grid-cols-[1.08fr_0.92fr]">
+      <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#07101d] px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
+        <div className="pointer-events-none absolute -left-40 -top-32 h-[34rem] w-[34rem] rounded-full bg-indigo-500/16 blur-[110px]" />
+        <div className="pointer-events-none absolute -bottom-40 right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-teal-400/12 blur-[110px]" />
+        <div className="pointer-events-none absolute inset-0 opacity-[0.06]" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.8) 1px, transparent 1px)', backgroundSize: '72px 72px' }} />
+
+        <div className="relative">
+          <div className="flex items-center gap-3">
+            <Logo className="h-11 w-11 shadow-xl shadow-indigo-500/25" />
+            <div>
+              <p className="text-xl font-black tracking-[-0.03em]">Clarion</p>
+              <p className="text-xs font-semibold text-slate-400">Lead intelligence workspace</p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-widest uppercase">Clarion</h1>
-          <p className="text-sm font-mono text-gray-400 mt-1">Lead Generation Platform</p>
         </div>
 
-        {/* --- CONDITIONALLY RENDER OTP OR AUTH FORM --- */}
-        {showOtp ? (
-          
-          /* OTP VERIFICATION UI */
-          <div className="animate-in fade-in zoom-in duration-300">
-            <h2 className="text-xl font-bold text-white mb-2 text-center">Verify Email</h2>
-            
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-6 text-center">
-              <p className="text-sm text-gray-300 mb-1">Code sent securely to:</p>
-              <p className="text-purple-400 font-mono font-bold">{email}</p>
+        <div className="relative max-w-2xl py-16">
+          <span className="inline-flex items-center gap-2 rounded-full border border-teal-300/15 bg-teal-300/[0.07] px-3 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-teal-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-300" />
+            Prospect with clarity
+          </span>
+          <h1 className="mt-7 max-w-xl text-5xl font-black leading-[1.04] tracking-[-0.055em] xl:text-6xl">
+            Find the right businesses. Reach them with context.
+          </h1>
+          <p className="mt-6 max-w-xl text-base leading-7 text-slate-300 xl:text-lg">
+            Clarion combines local discovery, website signals, lead storage, and editable outreach into one focused operating system.
+          </p>
+
+          <div className="mt-10 grid gap-3">
+            {benefits.map(({ icon: Icon, title, description }) => (
+              <article key={title} className="flex items-start gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.045] p-4 backdrop-blur-xl">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-teal-200">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-extrabold">{title}</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <p className="relative text-xs font-semibold text-slate-500">Secure authentication powered by Supabase.</p>
+      </section>
+
+      <section className="flex min-h-dvh items-center justify-center px-4 py-8 sm:px-8 lg:px-12">
+        <div className="w-full max-w-[470px]">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <Logo className="h-11 w-11 shadow-lg shadow-indigo-600/20" />
+            <div>
+              <p className="text-xl font-black tracking-[-0.03em] text-slate-950 dark:text-white">Clarion</p>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Lead intelligence workspace</p>
             </div>
-
-            <form onSubmit={handleVerifyOtp} className="space-y-5">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold uppercase tracking-wide text-gray-400">8-Digit Code</label>
-                  <span className={`text-xs font-mono font-bold ${timeLeft < 60 ? 'text-red-400' : 'text-gray-400'}`}>
-                    Expires in: {formattedTime}
-                  </span>
-                </div>
-                
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="text" required maxLength="8" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} 
-                    disabled={timeLeft === 0}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-3 pl-10 pr-4 text-white text-center tracking-[0.5em] font-bold text-xl outline-none transition-colors disabled:opacity-50"
-                    placeholder="••••••••" />
-                </div>
-              </div>
-
-              <button type="submit" disabled={loading || timeLeft === 0 || otp.length < 8} 
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>Confirm Registration</span>}
-              </button>
-            </form>
-
-            <button onClick={() => {setShowOtp(false); setTimeLeft(300);}} className="w-full mt-4 text-sm text-gray-500 hover:text-white flex items-center justify-center gap-2 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Return to Login
-            </button>
           </div>
 
-        ) : (
+          <div className="clarion-surface-strong rounded-[2rem] p-6 sm:p-8">
+            {showOtp ? (
+              <div className="clarion-enter">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowOtp(false);
+                    setTimeLeft(300);
+                    setOtp('');
+                  }}
+                  className="clarion-focus inline-flex items-center gap-2 rounded-lg text-xs font-extrabold text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back to account form
+                </button>
 
-          /* STANDARD LOGIN/REGISTER UI */
-          <div className="animate-in fade-in duration-300">
-            <h2 className="text-xl font-bold text-white mb-6 text-center">
-              {isLogin ? 'Welcome Back' : 'Create an Account'}
-            </h2>
+                <div className="mt-7 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                  <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <h1 className="mt-5 text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">Verify your email</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                  Enter the eight-digit code sent to <span className="font-extrabold text-slate-900 dark:text-slate-200">{email}</span>.
+                </p>
 
-            <form onSubmit={handleAuth} className="space-y-5">
-              
-              {/* 👈 NEW FULL NAME FIELD (Only shows during Sign Up) */}
-              {!isLogin && (
-                <div className="animate-in slide-in-from-top-2 duration-300">
-                  <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                    <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                      placeholder="John Doe" />
+                <form onSubmit={handleVerifyOtp} className="mt-7 space-y-5">
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <label htmlFor="otp" className="text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Verification code</label>
+                      <span className={`text-xs font-black tabular-nums ${timeLeft < 60 ? 'text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                        {timeLeft > 0 ? formattedTime : 'Expired'}
+                      </span>
+                    </div>
+                    <input
+                      id="otp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      required
+                      maxLength="8"
+                      value={otp}
+                      disabled={timeLeft === 0}
+                      onChange={(event) => setOtp(event.target.value.replace(/\D/g, ''))}
+                      className="clarion-input h-14 px-4 text-center text-xl font-black tracking-[0.42em]"
+                      placeholder="00000000"
+                    />
                   </div>
-                </div>
-              )}
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Email Address</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                    placeholder="you@company.com" />
-                </div>
+                  <button
+                    type="submit"
+                    disabled={loading || timeLeft === 0 || otp.length < 8}
+                    className="clarion-button-primary clarion-focus inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-black text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-5 w-5" aria-hidden="true" />}
+                    Confirm registration
+                  </button>
+                </form>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input type="password" required minLength="6" value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-2.5 pl-10 pr-4 text-white outline-none transition-colors"
-                    placeholder="••••••••" />
+            ) : (
+              <div className="clarion-enter">
+                <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-white/[0.06]" role="tablist" aria-label="Authentication mode">
+                  {[
+                    { value: true, label: 'Sign in' },
+                    { value: false, label: 'Create account' },
+                  ].map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      role="tab"
+                      aria-selected={isLogin === item.value}
+                      onClick={() => setIsLogin(item.value)}
+                      className={`clarion-focus flex-1 rounded-lg px-3 py-2.5 text-sm font-extrabold transition ${isLogin === item.value ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'}`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
+
+                <div className="mt-7">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">{isLogin ? 'Welcome back' : 'Start prospecting'}</p>
+                  <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+                    {isLogin ? 'Open your workspace' : 'Create your Clarion account'}
+                  </h1>
+                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                    {isLogin ? 'Sign in to continue managing searches, leads, and outreach.' : 'Registration currently supports verified Gmail addresses.'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleAuth} className="mt-7 space-y-4">
+                  {!isLogin && (
+                    <div className="clarion-enter">
+                      <label htmlFor="full-name" className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Full name</label>
+                      <div className="relative">
+                        <User className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                        <input
+                          id="full-name"
+                          type="text"
+                          autoComplete="name"
+                          required
+                          value={fullName}
+                          onChange={(event) => setFullName(event.target.value)}
+                          className="clarion-input h-12 pl-11 pr-4 text-sm font-semibold"
+                          placeholder="Your full name"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="email" className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Email address</label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        className="clarion-input h-12 pl-11 pr-4 text-sm font-semibold"
+                        placeholder="you@gmail.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="mb-2 block text-xs font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Password</label>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={isLogin ? 'current-password' : 'new-password'}
+                        required
+                        minLength="6"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        className="clarion-input h-12 pl-11 pr-12 text-sm font-semibold"
+                        placeholder="Minimum 6 characters"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="clarion-icon-button clarion-focus absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="h-[18px] w-[18px]" aria-hidden="true" /> : <Eye className="h-[18px] w-[18px]" aria-hidden="true" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="clarion-button-primary clarion-focus mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 text-sm font-black text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-5 w-5" aria-hidden="true" />}
+                    {isLogin ? 'Sign in to Clarion' : 'Create account'}
+                  </button>
+                </form>
               </div>
-
-              <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 disabled:opacity-50">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span>{isLogin ? 'Sign In' : 'Register Now'}</span>}
-              </button>
-            </form>
-
-            <div className="mt-6 text-center text-sm text-gray-400">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-purple-400 hover:text-purple-300 font-bold transition-colors underline">
-                {isLogin ? 'Sign up here' : 'Log in here'}
-              </button>
-            </div>
+            )}
           </div>
-        )}
-        
-      </div>
-    </div>
+
+          <p className="mt-5 text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+            By continuing, you confirm that you are authorized to use Clarion for legitimate business prospecting.
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }

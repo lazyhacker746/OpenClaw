@@ -1,144 +1,162 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabaseClient';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import { supabase } from './supabaseClient';
 import 'leaflet/dist/leaflet.css';
 
-// --- Organized Component Imports ---
 import AuthScreen from './components/auth/AuthScreen';
-import HistoryDashboard from './components/vault/HistoryDashboard';
-import LeadForm from './components/generator/LeadForm';
-import ResultsTable from './components/generator/ResultsTable';
-import Navbar from './components/layout/Navbar';
-import SettingsDashboard from './components/settings/SettingsDashboard';
 import AdminGuard from './components/auth/AdminGuard';
-import CommandCenter from './components/admin/CommandCenter';
 import Dashboard from './components/dashboard/Dashboard';
+import Navbar from './components/layout/Navbar';
+import Logo from './components/layout/Logo';
+
+const LeadForm = lazy(() => import('./components/generator/LeadForm'));
+const ResultsTable = lazy(() => import('./components/generator/ResultsTable'));
+const HistoryDashboard = lazy(() => import('./components/vault/HistoryDashboard'));
+const SettingsDashboard = lazy(() => import('./components/settings/SettingsDashboard'));
+const CommandCenter = lazy(() => import('./components/admin/CommandCenter'));
+
+function ScreenLoader({ label = 'Preparing your workspace' }) {
+  return (
+    <div className="clarion-surface flex min-h-[420px] flex-col items-center justify-center rounded-[1.75rem] px-6 text-center">
+      <div className="clarion-pulse-ring flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+        <LoaderCircle className="h-6 w-6 animate-spin" aria-hidden="true" />
+      </div>
+      <p className="mt-5 text-sm font-extrabold text-slate-900 dark:text-white">{label}</p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Loading only the tools needed for this view.</p>
+    </div>
+  );
+}
 
 export default function App() {
-  // --- State Management ---
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-
-  // Theme state
-  const [isDark, setIsDark] = useState(true);
-
-  // Generator specific state
+  const [isDark, setIsDark] = useState(() => {
+    const storedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return storedTheme ? storedTheme === 'dark' : prefersDark;
+  });
   const [leads, setLeads] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  // 👈 NEW: Global Vault State (Persists across tab changes)
   const [vaultHistory, setVaultHistory] = useState([]);
   const [isVaultLoaded, setIsVaultLoaded] = useState(false);
   const [isVaultLoading, setIsVaultLoading] = useState(false);
-
-  // 👈 NEW: Global Profile State (Persists across tab changes)
   const [userProfile, setUserProfile] = useState(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
-
-  // --- Theme Initialization ---
-  useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const initialDark = stored ? stored === 'dark' : true;
-    setIsDark(initialDark ?? prefersDark);
-  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
-  const toggleTheme = () => setIsDark((prev) => !prev);
-
-  // --- Authentication Listeners ---
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
       setLoadingAuth(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      setLoadingAuth(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // 👈 NEW: Global Fetch Function for the Vault
-  const fetchVaultHistory = useCallback(async (forceRefresh = false) => {
-    // If it's already loaded and we aren't forcing a refresh, skip the network request!
-    if (isVaultLoaded && !forceRefresh) return;
-    if (!session?.user) return;
+  const fetchVaultHistory = useCallback(
+    async (forceRefresh = false) => {
+      if (isVaultLoaded && !forceRefresh) return;
+      if (!session?.user) return;
 
-    setIsVaultLoading(true);
+      setIsVaultLoading(true);
+      try {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/history?user_id=${session.user.id}`);
+        const result = await response.json();
 
-    try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/history?user_id=${session.user.id}`);
-      const result = await response.json();
-
-      if (result.status === 'success') {
-        setVaultHistory(result.data);
-        setIsVaultLoaded(true);
+        if (result.status === 'success') {
+          setVaultHistory(Array.isArray(result.data) ? result.data : []);
+          setIsVaultLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to load history:', error);
+      } finally {
+        setIsVaultLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to load history:", error);
-    } finally {
-      setIsVaultLoading(false);
-    }
-  }, [isVaultLoaded, session?.user]);
+    },
+    [isVaultLoaded, session],
+  );
 
-  // 👈 NEW: Global Fetch Function for the User Profile
-  const fetchUserProfile = useCallback(async (forceRefresh = false) => {
-    // If it's already loaded and we aren't forcing a refresh, skip the network request!
-    if (userProfile && !forceRefresh) return;
-    if (!session?.user) return;
+  const fetchUserProfile = useCallback(
+    async (forceRefresh = false) => {
+      if (userProfile && !forceRefresh) return;
+      if (!session?.user) return;
 
-    setIsProfileLoading(true);
-    try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_BASE}/api/user/profile?user_id=${session.user.id}`);
-      const result = await response.json();
+      setIsProfileLoading(true);
+      try {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE}/api/user/profile?user_id=${session.user.id}`);
+        const result = await response.json();
 
-      if (result.status === 'success') {
-        setUserProfile(result.data);
+        if (result.status === 'success') {
+          setUserProfile(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+      } finally {
+        setIsProfileLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to load profile:", error);
-    } finally {
-      setIsProfileLoading(false);
-    }
-  }, [userProfile, session?.user]);
+    },
+    [session, userProfile],
+  );
 
-  // 👈 NEW: Fetch vault data once the user is authenticated
   useEffect(() => {
     if (session?.user) {
       fetchVaultHistory();
       fetchUserProfile();
     }
-  }, [session?.user, fetchVaultHistory, fetchUserProfile]);
+  }, [fetchUserProfile, fetchVaultHistory, session?.user]);
 
-  // --- Actions ---
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
       setSession(null);
-      // Clean up cache on logout
       setVaultHistory([]);
       setIsVaultLoaded(false);
       setUserProfile(null);
+      setLeads([]);
       setActiveTab('dashboard');
     } catch (error) {
-      console.error("Logout Error:", error);
+      console.error('Logout error:', error);
     }
   };
 
-  // --- UI Renders ---
+  const toasterOptions = {
+    duration: 4200,
+    style: {
+      background: isDark ? '#111a2b' : '#ffffff',
+      color: isDark ? '#f8fafc' : '#0f172a',
+      border: isDark ? '1px solid rgba(148,163,184,.18)' : '1px solid #e2e8f0',
+      borderRadius: '14px',
+      boxShadow: isDark ? '0 24px 70px rgba(0,0,0,.35)' : '0 24px 70px rgba(15,23,42,.16)',
+      fontSize: '14px',
+      fontWeight: 700,
+      padding: '12px 14px',
+    },
+  };
+
   if (loadingAuth) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] flex items-center justify-center text-purple-500 font-bold tracking-widest uppercase">
-        Initializing Command Center...
+      <div className="clarion-app-shell flex min-h-dvh items-center justify-center px-6">
+        <div className="flex flex-col items-center text-center">
+          <Logo className="h-14 w-14 shadow-xl shadow-indigo-600/20" />
+          <LoaderCircle className="mt-6 h-5 w-5 animate-spin text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
+          <p className="mt-3 text-sm font-extrabold text-slate-900 dark:text-white">Opening Clarion</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Securing your workspace and syncing account data.</p>
+        </div>
       </div>
     );
   }
@@ -146,111 +164,106 @@ export default function App() {
   if (!session) {
     return (
       <>
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: isDark ? '#1F2937' : '#FFFFFF',
-              color: isDark ? '#fff' : '#111827',
-              border: isDark ? '1px solid #374151' : '1px solid #E5E7EB',
-            },
-          }}
-        />
+        <Toaster position="top-center" toastOptions={toasterOptions} />
         <AuthScreen />
       </>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B0F19] text-gray-900 dark:text-gray-200 font-sans selection:bg-purple-500/30">
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: isDark ? '#1F2937' : '#FFFFFF',
-            color: isDark ? '#fff' : '#111827',
-            border: isDark ? '1px solid #374151' : '1px solid #E5E7EB',
-          },
-        }}
-      />
+    <div className="clarion-app-shell min-h-dvh text-slate-900 dark:text-slate-100">
+      <Toaster position="top-center" toastOptions={toasterOptions} />
 
-      <header className="sticky top-0 z-50">
+      <header className="sticky top-0 z-[800]">
         <Navbar
           isDark={isDark}
-          toggleTheme={toggleTheme}
+          toggleTheme={() => setIsDark((current) => !current)}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onLogout={handleLogout}
-          user={session?.user}
+          user={session.user}
           profile={userProfile}
           isGenerating={isGenerating}
         />
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* TAB 1: HOME DASHBOARD */}
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            user={session.user}
-            profile={userProfile}
-            history={vaultHistory}
-            profileLoading={isProfileLoading}
-            vaultLoading={isVaultLoading}
-            setActiveTab={setActiveTab}
-          />
-        )}
+      <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
+        <div key={activeTab} className="clarion-enter">
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              user={session.user}
+              profile={userProfile}
+              history={vaultHistory}
+              profileLoading={isProfileLoading}
+              vaultLoading={isVaultLoading}
+              setActiveTab={setActiveTab}
+            />
+          )}
 
-        {/* TAB 2: GENERATOR */}
-        {activeTab === 'generator' && (
-          <div className="flex flex-col md:flex-row gap-8">
-            <div className="w-full md:w-1/3">
-              <LeadForm
-                setLeads={setLeads}
-                setIsGenerating={setIsGenerating}
-                isGenerating={isGenerating}
+          {activeTab === 'generator' && (
+            <Suspense fallback={<ScreenLoader label="Loading the lead generator" />}>
+              <section className="space-y-6" aria-labelledby="generator-title">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">Prospecting workspace</p>
+                    <h1 id="generator-title" className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">Build a qualified lead list</h1>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-400 sm:text-base">
+                      Define a market, deploy the search agent, and move from local discovery to a ready-to-send pitch in one workflow.
+                    </p>
+                  </div>
+                  <div className="hidden rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-bold text-emerald-800 shadow-sm dark:border-emerald-400/15 dark:bg-emerald-400/[0.08] dark:text-emerald-300 md:block">
+                    Live results are saved to your Vault automatically
+                  </div>
+                </div>
+
+                <div className="grid items-start gap-6 xl:grid-cols-[390px_minmax(0,1fr)]">
+                  <LeadForm
+                    setLeads={setLeads}
+                    setIsGenerating={setIsGenerating}
+                    isGenerating={isGenerating}
+                    user={session.user}
+                    profile={userProfile}
+                    onScrapeComplete={() => {
+                      fetchVaultHistory(true);
+                      fetchUserProfile(true);
+                    }}
+                  />
+                  <ResultsTable leads={leads} isGenerating={isGenerating} />
+                </div>
+              </section>
+            </Suspense>
+          )}
+
+          {activeTab === 'vault' && (
+            <Suspense fallback={<ScreenLoader label="Opening your Lead Vault" />}>
+              <HistoryDashboard
                 user={session.user}
-                onScrapeComplete={() => {
-                  fetchVaultHistory(true);
-                  fetchUserProfile(true);
-                }}
+                history={vaultHistory}
+                setHistory={setVaultHistory}
+                loading={isVaultLoading}
               />
-            </div>
-            <div className="w-full md:w-2/3">
-              <ResultsTable
-                leads={leads}
-                isGenerating={isGenerating}
+            </Suspense>
+          )}
+
+          {activeTab === 'settings' && (
+            <Suspense fallback={<ScreenLoader label="Loading account settings" />}>
+              <SettingsDashboard
+                user={session.user}
+                profile={userProfile}
+                setProfile={setUserProfile}
+                loading={isProfileLoading}
               />
-            </div>
-          </div>
-        )}
+            </Suspense>
+          )}
 
-        {/* TAB 3: VAULT */}
-        {activeTab === 'vault' && (
-          <HistoryDashboard
-            user={session.user}
-            history={vaultHistory}
-            setHistory={setVaultHistory}
-            loading={isVaultLoading}
-          />
-        )}
-
-        {/* TAB 4: SETTINGS */}
-        {activeTab === 'settings' && (
-          <SettingsDashboard
-            user={session.user}
-            profile={userProfile}          // 👈 Pass the cached data
-            setProfile={setUserProfile}    // 👈 Let Settings update the cache on save
-            loading={isProfileLoading}     // 👈 Pass the loading state
-          />
-        )}
-
-        {/* TAB 5: ADMIN COMMAND CENTER (SECURED) */}
-        {activeTab === 'admin' && (
-          <AdminGuard profile={userProfile} setActiveTab={setActiveTab}>
-             <CommandCenter user={session.user} />
-          </AdminGuard>
-        )}
-
+          {activeTab === 'admin' && (
+            <AdminGuard profile={userProfile} setActiveTab={setActiveTab}>
+              <Suspense fallback={<ScreenLoader label="Loading the Admin Command Center" />}>
+                <CommandCenter user={session.user} />
+              </Suspense>
+            </AdminGuard>
+          )}
+        </div>
       </main>
     </div>
   );

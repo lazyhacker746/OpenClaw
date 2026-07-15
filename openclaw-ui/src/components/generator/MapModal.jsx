@@ -1,23 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom'; // 👈 NEW: Portals to break out of the container
-import { MapContainer, TileLayer, Circle, useMapEvents, useMap } from 'react-leaflet';
-import { X, Crosshair, Search, Loader2, MapPin } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Circle, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { Crosshair, Loader2, LocateFixed, MapPin, Search, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// Automatically pans the map when a location is selected
 function MapController({ center }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(center, 13, { duration: 1.5 });
+    map.flyTo(center, 13, { duration: 1.2 });
   }, [center, map]);
   return null;
 }
 
-// Handles user clicking on the map to set a new pin
 function LocationSelector({ setPosition }) {
   useMapEvents({
-    click(e) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
+    click(event) {
+      setPosition([event.latlng.lat, event.latlng.lng]);
     },
   });
   return null;
@@ -26,25 +24,37 @@ function LocationSelector({ setPosition }) {
 export default function MapModal({ isOpen, onClose, onConfirm }) {
   const [position, setPosition] = useState([33.7715, 72.7511]);
   const [radius, setRadius] = useState(5);
-
-  // Autocomplete State
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isResolving, setIsResolving] = useState(false);
 
-  // 1. THE DEBOUNCER: Only searches 500ms after the user STOPS typing
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.length > 2) {
+    if (!isOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    const delay = window.setTimeout(async () => {
+      if (searchQuery.trim().length > 2) {
         setIsSearching(true);
         try {
           const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`);
           const data = await response.json();
-          setSuggestions(data);
+          setSuggestions(Array.isArray(data) ? data : []);
           setShowSuggestions(true);
         } catch (error) {
-          console.error("Geocoding failed:", error);
+          console.error('Geocoding failed:', error);
         } finally {
           setIsSearching(false);
         }
@@ -52,150 +62,160 @@ export default function MapModal({ isOpen, onClose, onConfirm }) {
         setSuggestions([]);
         setShowSuggestions(false);
       }
-    }, 500); // Wait 0.5 seconds
+    }, 500);
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => window.clearTimeout(delay);
   }, [searchQuery]);
 
-  const handleSelectLocation = (lat, lon, displayName) => {
-    setPosition([parseFloat(lat), parseFloat(lon)]);
-    setSearchQuery(displayName.split(',')[0]); // Only show the main city name in the box
+  const selectLocation = (lat, lon, displayName) => {
+    setPosition([Number.parseFloat(lat), Number.parseFloat(lon)]);
+    setSearchQuery(displayName.split(',')[0]);
     setShowSuggestions(false);
   };
 
-  const handleLiveLocation = () => {
-    if ("geolocation" in navigator) {
-      const loadingToast = toast.loading("Locating you...");
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setPosition([pos.coords.latitude, pos.coords.longitude]);
-          toast.success("Location found!", { id: loadingToast });
-        },
-        (err) => {
-          toast.error("Location access denied or unavailable.", { id: loadingToast });
-        }
-      );
-    } else {
-      toast.error("Geolocation is not supported by your browser.");
+  const useLiveLocation = () => {
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by this browser.');
+      return;
     }
+
+    const loadingToast = toast.loading('Locating your device...');
+    navigator.geolocation.getCurrentPosition(
+      (result) => {
+        setPosition([result.coords.latitude, result.coords.longitude]);
+        toast.success('Location found.', { id: loadingToast });
+      },
+      () => toast.error('Location access was denied or unavailable.', { id: loadingToast }),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   };
 
-  const handleConfirmClick = async () => {
-    const loadingToast = toast.loading("Resolving area coordinates...");
+  const confirmArea = async () => {
+    setIsResolving(true);
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${position[0]}&lon=${position[1]}`);
       const data = await response.json();
-
-      // Extract the most accurate city/town name
       const address = data.address || {};
-      const resolvedCity = address.city || address.town || address.village || address.county || "Custom Map Area";
-
-      toast.dismiss(loadingToast);
+      const resolvedCity = address.city || address.town || address.village || address.county || 'Custom map area';
       onConfirm({ lat: position[0], lng: position[1], radius, resolvedCity });
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      onConfirm({ lat: position[0], lng: position[1], radius, resolvedCity: "Custom Map Area" });
+    } catch {
+      onConfirm({ lat: position[0], lng: position[1], radius, resolvedCity: 'Custom map area' });
+    } finally {
+      setIsResolving(false);
     }
   };
 
   if (!isOpen) return null;
 
-  // 2. THE PORTAL: Injects this HTML directly into the body tag so it covers the whole screen
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6">
-
-      {/* Massive, centered modal window */}
-      <div className="bg-[#0B0F19] border border-gray-800 rounded-2xl shadow-2xl w-full max-w-5xl overflow-visible flex flex-col h-[85vh] max-h-[800px]">
-
-        {/* Header & Autocomplete Search Bar Area */}
-        <div className="p-4 sm:p-6 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#111827] gap-4 relative z-50">
-          <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-widest">Select Target Area</h3>
-            <p className="text-sm text-gray-400 mt-1">Search for a location or click the map to drop a pin.</p>
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-md sm:p-6"
+      onMouseDown={onClose}
+      role="presentation"
+    >
+      <section
+        className="clarion-surface-strong clarion-enter flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-[1.75rem]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="map-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="relative z-[600] flex flex-col gap-4 border-b border-slate-200/80 p-4 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">
+              <MapPin className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-300">Precision targeting</p>
+              <h2 id="map-modal-title" className="mt-1 text-xl font-black tracking-[-0.035em] text-slate-950 dark:text-white">Choose a search area</h2>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Search, click the map, or use your current location.</p>
+            </div>
           </div>
 
-          <div className="flex w-full sm:w-auto items-center gap-3">
-            <div className="relative w-full sm:w-80">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative min-w-0 flex-1 sm:w-[340px] sm:flex-none">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden="true" />
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search city or area..."
-                className="w-full bg-black/50 border border-gray-700 focus:border-purple-500 rounded-lg py-3 pl-4 pr-10 text-white text-sm outline-none transition-colors"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                placeholder="Search city or neighborhood"
+                className="clarion-input h-11 pl-11 pr-10 text-sm font-semibold"
+                aria-expanded={showSuggestions && suggestions.length > 0}
+                aria-autocomplete="list"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-              </div>
+              {isSearching && <Loader2 className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-indigo-600 dark:text-indigo-300" aria-hidden="true" />}
 
-              {/* Autocomplete Dropdown */}
               {showSuggestions && suggestions.length > 0 && (
-                <ul className="absolute top-full left-0 w-full mt-2 bg-[#111827] border border-gray-700 rounded-lg shadow-2xl overflow-hidden z-[10000]">
+                <ul className="clarion-surface-strong clarion-scrollbar absolute left-0 top-full z-[800] mt-2 max-h-72 w-full overflow-y-auto rounded-2xl p-1.5 shadow-2xl" role="listbox">
                   {suggestions.map((item, index) => (
-                    <li
-                      key={index}
-                      onClick={() => handleSelectLocation(item.lat, item.lon, item.display_name)}
-                      className="px-4 py-3 hover:bg-purple-600/20 cursor-pointer flex items-start gap-3 border-b border-gray-800 last:border-0 transition-colors"
-                    >
-                      <MapPin className="w-4 h-4 text-purple-400 mt-0.5 shrink-0" />
-                      <span className="text-sm text-gray-300 truncate">{item.display_name}</span>
+                    <li key={item.place_id || index} role="option" aria-selected="false">
+                      <button type="button" onClick={() => selectLocation(item.lat, item.lon, item.display_name)} className="clarion-focus flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-900 dark:text-slate-300 dark:hover:bg-indigo-400/[0.08] dark:hover:text-indigo-200">
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
+                        <span className="line-clamp-2 leading-5">{item.display_name}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            <button onClick={onClose} className="p-3 text-gray-400 hover:text-white transition-colors rounded-full hover:bg-gray-800 shrink-0">
-              <X className="w-6 h-6" />
+            <button type="button" onClick={onClose} className="clarion-icon-button clarion-focus inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400 dark:hover:bg-white/[0.08] dark:hover:text-white" aria-label="Close map">
+              <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* The Map */}
-        <div className="flex-grow w-full relative bg-gray-900 z-0">
+        <div className="relative min-h-0 flex-1 bg-slate-200 dark:bg-slate-900">
           <MapContainer center={position} zoom={13} style={{ height: '100%', width: '100%', zIndex: 0 }}>
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              attribution='&copy; CARTO'
-            />
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution="&copy; OpenStreetMap &copy; CARTO" />
             <MapController center={position} />
             <LocationSelector setPosition={setPosition} />
-            <Circle center={position} radius={50} pathOptions={{ color: '#9333ea', fillColor: '#9333ea', fillOpacity: 1 }} />
-            <Circle center={position} radius={radius * 1000} pathOptions={{ color: '#a855f7', fillColor: '#a855f7', fillOpacity: 0.15, weight: 2 }} />
+            <Circle center={position} radius={65} pathOptions={{ color: '#4f46e5', fillColor: '#4f46e5', fillOpacity: 0.95, weight: 2 }} />
+            <Circle center={position} radius={radius * 1000} pathOptions={{ color: '#4f46e5', fillColor: '#4f46e5', fillOpacity: 0.12, weight: 2 }} />
           </MapContainer>
 
-          {/* 👈 FIXED: Added cursor-pointer and hover background for better UX */}
-          <button
-            onClick={handleLiveLocation}
-            className="absolute bottom-6 right-6 z-[400] bg-white text-gray-900 p-3 sm:px-4 sm:py-3 rounded-full shadow-xl hover:bg-gray-200 transition-all cursor-pointer font-bold flex items-center gap-2 text-sm border-2 border-transparent hover:border-purple-500"
-          >
-            <Crosshair className="w-5 h-5 text-purple-600" />
-            <span className="hidden sm:inline">Use My Location</span>
-          </button>
-        </div>
-
-        {/* Controls Footer */}
-        <div className="p-6 bg-[#111827] flex flex-col sm:flex-row items-center gap-6 z-50">
-          <div className="w-full sm:flex-1">
-            <div className="flex justify-between items-center mb-3">
-              <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Search Radius</label>
-              <span className="text-sm font-bold text-purple-400 bg-purple-900/30 px-3 py-1 rounded-full border border-purple-500/20">{radius} km</span>
-            </div>
-            <input
-              type="range" min="1" max="25" value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
-              className="w-full accent-purple-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-            />
+          <div className="pointer-events-none absolute left-4 top-4 z-[450] rounded-2xl border border-white/70 bg-white/90 px-3.5 py-3 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[#0c1423]/90 sm:left-6 sm:top-6">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Selected center</p>
+            <p className="mt-1 text-xs font-black tabular-nums text-slate-900 dark:text-white">{position[0].toFixed(5)}, {position[1].toFixed(5)}</p>
           </div>
 
           <button
-            onClick={handleConfirmClick} // 👈 Using the new async function
-            className="w-full sm:w-auto px-10 bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] whitespace-nowrap text-lg"
+            type="button"
+            onClick={useLiveLocation}
+            className="clarion-button-secondary clarion-focus absolute bottom-4 right-4 z-[450] inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/95 px-4 text-xs font-black text-slate-800 shadow-xl backdrop-blur-xl hover:bg-white dark:border-white/10 dark:bg-[#0c1423]/92 dark:text-white dark:hover:bg-[#15213a] sm:bottom-6 sm:right-6"
           >
-            Confirm Area
+            <LocateFixed className="h-4 w-4 text-indigo-600 dark:text-indigo-300" aria-hidden="true" />
+            Use my location
           </button>
         </div>
-      </div>
+
+        <footer className="flex flex-col gap-5 border-t border-slate-200/80 p-5 dark:border-white/[0.08] sm:flex-row sm:items-end sm:p-6">
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-600 dark:text-slate-400">Search radius</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Clarion will qualify businesses inside this circle.</p>
+              </div>
+              <span className="rounded-xl bg-indigo-50 px-3 py-2 text-sm font-black tabular-nums text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-300">{radius} km</span>
+            </div>
+            <input type="range" min="1" max="25" value={radius} onChange={(event) => setRadius(Number(event.target.value))} className="clarion-range w-full appearance-none" aria-label="Search radius in kilometers" />
+            <div className="mt-2 flex justify-between text-[10px] font-bold text-slate-400 dark:text-slate-500"><span>1 km</span><span>25 km</span></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={confirmArea}
+            disabled={isResolving}
+            className="clarion-button-primary clarion-focus inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 text-sm font-black text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+          >
+            {isResolving ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Crosshair className="h-5 w-5" aria-hidden="true" />}
+            Confirm this area
+          </button>
+        </footer>
+      </section>
     </div>,
-    document.body // 👈 Attaches the portal directly to the HTML body
+    document.body,
   );
 }
