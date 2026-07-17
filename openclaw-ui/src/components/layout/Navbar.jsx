@@ -1,8 +1,8 @@
 import {
   Home,
+  LayoutGrid,
   LogOut,
   Moon,
-  Search,
   ShieldCheck,
   SlidersHorizontal,
   Sun,
@@ -33,8 +33,8 @@ export default function Navbar({
   const isAdmin = String(profile?.role || '').toLowerCase() === 'admin';
 
   const navigationItems = [
+    { id: 'tools', label: 'Tools', icon: LayoutGrid },
     { id: 'dashboard', label: 'Home', icon: Home },
-    { id: 'generator', label: 'Generator', icon: Search },
     { id: 'vault', label: 'Vault', icon: Users },
     { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
     ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: ShieldCheck, admin: true }] : []),
@@ -66,7 +66,7 @@ export default function Navbar({
           <div className="hidden items-center gap-1 rounded-2xl border border-slate-200/85 bg-slate-100/70 p-1.5 shadow-inner shadow-slate-200/30 dark:border-white/[0.08] dark:bg-white/[0.045] dark:shadow-none lg:flex">
             {navigationItems.map((item) => {
               const Icon = item.icon;
-              const active = activeTab === item.id;
+              const active = activeTab === item.id || (item.id === 'tools' && activeTab === 'generator');
               const activeClass = item.admin
                 ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
                 : 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:text-white dark:ring-white/10';
@@ -86,7 +86,7 @@ export default function Navbar({
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
                   {item.label}
-                  {item.id === 'generator' && isGenerating && (
+                  {item.id === 'tools' && isGenerating && (
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" aria-label="Search running" />
                   )}
                 </button>
@@ -134,7 +134,7 @@ export default function Navbar({
         <div className="flex items-stretch gap-1 overflow-x-auto clarion-scrollbar">
           {navigationItems.map((item) => {
             const Icon = item.icon;
-            const active = activeTab === item.id;
+            const active = activeTab === item.id || (item.id === 'tools' && activeTab === 'generator');
             return (
               <button
                 key={item.id}
@@ -154,7 +154,7 @@ export default function Navbar({
               >
                 <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                 <span>{item.label}</span>
-                {item.id === 'generator' && isGenerating && (
+                {item.id === 'tools' && isGenerating && (
                   <span className="absolute right-2 top-2 h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
                 )}
               </button>

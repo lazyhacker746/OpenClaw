@@ -9,6 +9,7 @@ import AdminGuard from './components/auth/AdminGuard';
 import Dashboard from './components/dashboard/Dashboard';
 import Navbar from './components/layout/Navbar';
 import Logo from './components/layout/Logo';
+import ToolsPage from './components/tools/ToolsPage';
 
 const LeadForm = lazy(() => import('./components/generator/LeadForm'));
 const ResultsTable = lazy(() => import('./components/generator/ResultsTable'));
@@ -31,7 +32,7 @@ function ScreenLoader({ label = 'Preparing your workspace' }) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('tools');
   const [isDark, setIsDark] = useState(() => {
     const storedTheme = localStorage.getItem('theme');
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -128,7 +129,7 @@ export default function App() {
       setIsVaultLoaded(false);
       setUserProfile(null);
       setLeads([]);
-      setActiveTab('dashboard');
+      setActiveTab('tools');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -189,6 +190,14 @@ export default function App() {
 
       <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-12">
         <div key={activeTab} className="clarion-enter">
+          {activeTab === 'tools' && (
+            <ToolsPage
+              user={session.user}
+              profile={userProfile}
+              setActiveTab={setActiveTab}
+            />
+          )}
+
           {activeTab === 'dashboard' && (
             <Dashboard
               user={session.user}
