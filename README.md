@@ -371,12 +371,6 @@ profiles.last_reset_date
 
 The frontend is hosted on Vercel and deploys automatically from the GitHub `main` branch.
 
-```bash
-git add .
-git commit -m "Describe the frontend change"
-git push origin main
-```
-
 Live frontend:
 
 ```text
@@ -391,58 +385,6 @@ The backend is hosted as a Hugging Face Docker Space.
 
 Make sure the Hugging Face remote exists:
 
-```bash
-git remote add hf https://huggingface.co/spaces/lazyhacker786/clarion-backend
-```
-
-Check configured remotes:
-
-```bash
-git remote -v
-```
-
-Deploy the contents of `hf-space`:
-
-```bash
-HF_URL=$(git remote get-url hf)
-
-cd hf-space
-git init
-git add .
-git commit -m "Describe the backend change"
-git push --force "$HF_URL" HEAD:main
-rm -rf .git
-cd ..
-```
-
-When prompted for the Hugging Face password, use a Hugging Face write token.
-
-Live backend:
-
-```text
-https://lazyhacker786-clarion-backend.hf.space
-```
-
----
-
-## Hugging Face Metadata
-
-The root `hf-space/README.md` must include valid Hugging Face Space metadata.
-
-```yaml
----
-title: Clarion Backend
-emoji: 🚀
-colorFrom: indigo
-colorTo: indigo
-sdk: docker
-pinned: false
----
-```
-
-Only supported Hugging Face colors should be used.
-
----
 
 ## Backend Stability Rules
 
@@ -522,27 +464,6 @@ Files stored in `/tmp` are temporary and may disappear when the Hugging Face con
 - Avoid logging secret values.
 - Keep API error messages safe for production users.
 
-Confirm ignored files:
-
-```bash
-git check-ignore -v \
-  hf-space/.env \
-  openclaw-ui/.env.local \
-  .venv
-```
-
-The repository should not include:
-
-```text
-.env
-.env.local
-.venv
-node_modules
-dist
-__pycache__
-```
-
----
 
 ## Design System
 
@@ -581,15 +502,6 @@ Clarion currently includes:
 - Vercel deployment
 - Hugging Face deployment
 
-Before changing backend architecture, inspect the current repository state:
-
-```bash
-git status
-git log --oneline -10
-git rev-parse HEAD
-```
-
----
 
 ## Maintainer
 
