@@ -1,7 +1,7 @@
 import time
 from playwright.sync_api import sync_playwright
 from auditor import analyze_website
-from ai_engine import generate_pitch
+from app.adapters.ai import generate_pitch
 
 
 def format_whatsapp_link(phone_raw):
