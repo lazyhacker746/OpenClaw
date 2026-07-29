@@ -1,36 +1,57 @@
-"""Lead-generation orchestration extracted from the legacy API module.
+"""Lead-generation orchestration around the verified legacy behavior."""
 
-The order of validation, credit checks, Playwright execution, CSV backup,
-Supabase persistence, and credit deduction is intentionally unchanged in
-Stage 1. CSV failure isolation is reserved for the separately approved Stage 2
-hardening unit.
-"""
+from __future__ import annotations
 
-import os
 import uuid
+from pathlib import Path
 
-import pandas as pd
-
+from app.core.errors import normalize_exception
+from app.core.logging import get_logger
+from app.core.request_context import bind_context, get_request_id
+from app.services.concurrency import SearchConcurrencyLimiter
+from app.services.exports import CsvExportService
 from validators import validate_inputs
 
 
+logger = get_logger(__name__)
+
+
 class GenerationService:
-    def __init__(self, scraper, database, task_registry):
+    def __init__(
+        self,
+        scraper,
+        database,
+        task_registry,
+        search_limiter=None,
+        export_service=None,
+    ):
         self.scraper = scraper
         self.database = database
         self.task_registry = task_registry
+        self.search_limiter = search_limiter or SearchConcurrencyLimiter(1)
+        self.export_service = export_service or CsvExportService(
+            Path("/tmp/clarion-exports")
+        )
 
     def start_search(self, request, background_tasks):
-        print(
-            f"\n[+] INCOMING REQUEST: Targeting {request.category} "
-            f"in {request.city} for User {request.user_id}"
+        request_id = get_request_id()
+        logger.info(
+            "search_request_received",
+            extra={
+                "event": "search_request_received",
+                "user_id": request.user_id,
+                "category": request.category,
+                "city": request.city,
+            },
         )
 
         payload = request.model_dump()
         errors, clean_data = validate_inputs(payload)
-
         if errors:
-            print("[-] VALIDATION FAILED")
+            logger.info(
+                "search_validation_failed",
+                extra={"event": "search_validation_failed", "error_count": len(errors)},
+            )
             return {"status": "error", "message": errors}
 
         profile = self.database.check_and_eval_credits(request.user_id)
@@ -60,15 +81,23 @@ class GenerationService:
                 ],
             }
 
-        print("[+] VALIDATION & SECURITY PASSED. Queuing Background Task...")
-
         task_id = str(uuid.uuid4())
         self.task_registry.set(
             task_id,
             {"status": "starting", "progress": "Initializing Playwright engine..."},
+            request_id=request_id,
         )
-        background_tasks.add_task(self.run_background_task, task_id, request, clean_data)
-
+        background_tasks.add_task(
+            self.run_background_task,
+            task_id,
+            request,
+            clean_data,
+            request_id,
+        )
+        logger.info(
+            "search_queued",
+            extra={"event": "search_queued", "task_id": task_id},
+        )
         return {"status": "processing", "task_id": task_id}
 
     def get_status(self, task_id: str):
@@ -77,75 +106,126 @@ class GenerationService:
             return {"status": "error", "message": ["Invalid or expired Task ID."]}
         return task_info
 
-    def run_background_task(self, task_id: str, request, clean_data: dict):
-        print(f"\n[⚙️ WORKER] Starting Background Task: {task_id}")
-
-        try:
+    def run_background_task(
+        self,
+        task_id: str,
+        request,
+        clean_data: dict,
+        request_id: str | None = None,
+    ):
+        correlated_request_id = request_id or self.task_registry.get_request_id(task_id)
+        with bind_context(request_id=correlated_request_id, task_id=task_id):
             self.task_registry.set(
                 task_id,
                 {
                     "status": "processing",
-                    "progress": (
-                        f"Scraping {clean_data['category']} in {clean_data['city']}..."
-                    ),
+                    "progress": "Waiting for an available search slot...",
                 },
             )
+            logger.info(
+                "search_worker_waiting",
+                extra={"event": "search_worker_waiting"},
+            )
 
-            results = self.scraper.run(clean_data)
+            try:
+                with self.search_limiter.slot():
+                    logger.info(
+                        "search_worker_started",
+                        extra={
+                            "event": "search_worker_started",
+                            "active_searches": self.search_limiter.active_count,
+                        },
+                    )
+                    self.task_registry.set(
+                        task_id,
+                        {
+                            "status": "processing",
+                            "progress": (
+                                f"Scraping {clean_data['category']} in "
+                                f"{clean_data['city']}..."
+                            ),
+                        },
+                    )
+                    results = self.scraper.run(clean_data)
 
-            if results:
-                self.task_registry.set(
-                    task_id,
-                    {"status": "processing", "progress": "Saving leads to Cloud Vault..."},
-                )
+                    if not results:
+                        self.task_registry.set(
+                            task_id,
+                            {
+                                "status": "error",
+                                "message": [
+                                    "No leads found matching those exact filters."
+                                ],
+                            },
+                        )
+                        logger.info(
+                            "search_no_results",
+                            extra={"event": "search_no_results"},
+                        )
+                        return
 
-                export_dir = "exports"
-                os.makedirs(export_dir, exist_ok=True)
-                df = pd.DataFrame(results)
-                filename = os.path.join(
-                    export_dir,
-                    f"ServerBackup_{clean_data['category']}_{clean_data['city']}.csv",
-                )
-                df.to_csv(filename, index=False)
-
-                print(
-                    f"[+] Routing {len(results)} leads to Clarion Cloud Vault "
-                    f"for User {request.user_id}..."
-                )
-
-                saved_count = self.database.save_leads_to_db(
-                    city=clean_data["city"],
-                    category=clean_data["category"],
-                    leads=results,
-                    user_id=request.user_id,
-                )
-
-                if saved_count > 0:
-                    use_ai = clean_data.get("use_ai", True)
-                    self.database.deduct_user_credits(
-                        request.user_id,
-                        saved_count,
-                        use_ai,
+                    self.task_registry.set(
+                        task_id,
+                        {
+                            "status": "processing",
+                            "progress": "Saving leads to Cloud Vault...",
+                        },
+                    )
+                    logger.info(
+                        "vault_persistence_started",
+                        extra={
+                            "event": "vault_persistence_started",
+                            "lead_count": len(results),
+                            "user_id": request.user_id,
+                        },
+                    )
+                    saved_count = self.database.save_leads_to_db(
+                        city=clean_data["city"],
+                        category=clean_data["category"],
+                        leads=results,
+                        user_id=request.user_id,
                     )
 
-                print(f"[+] SUCCESS: Task {task_id} completed.")
-                self.task_registry.set(task_id, {"status": "success", "data": results})
-            else:
-                print("[-] No targets acquired.")
+                    if saved_count > 0:
+                        self.database.deduct_user_credits(
+                            request.user_id,
+                            saved_count,
+                            clean_data.get("use_ai", True),
+                        )
+
+                    # Temporary export is deliberately after permanent persistence
+                    # and is internally best-effort, so it cannot fail the task.
+                    self.export_service.export(
+                        results,
+                        category=clean_data["category"],
+                        city=clean_data["city"],
+                    )
+
+                    self.task_registry.set(
+                        task_id, {"status": "success", "data": results}
+                    )
+                    logger.info(
+                        "search_completed",
+                        extra={
+                            "event": "search_completed",
+                            "result_count": len(results),
+                            "saved_count": saved_count,
+                        },
+                    )
+            except Exception as exc:
+                normalized = normalize_exception(exc, operation="Scraping engine")
+                logger.exception(
+                    "search_failed",
+                    extra={
+                        "event": "search_failed",
+                        "error_category": normalized.category,
+                        "exception_type": normalized.exception_type,
+                    },
+                )
                 self.task_registry.set(
                     task_id,
                     {
                         "status": "error",
-                        "message": ["No leads found matching those exact filters."],
+                        "message": [normalized.public_message],
                     },
                 )
-
-        except Exception as exc:
-            print(f"[!] SYSTEM FAILURE on Task {task_id}: {str(exc)}")
-            self.task_registry.set(
-                task_id,
-                {
-                    "status": "error",
-                    "message": [f"Scraping engine failed: {str(exc)}"],
-                },
-            )

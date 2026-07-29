@@ -1,9 +1,9 @@
-"""Thin compatibility adapter for the existing ``database.py`` module.
+"""Thin compatibility adapter for the verified legacy ``database.py`` module.
 
 The legacy module remains the source of truth for Supabase persistence, Vault
 linking, duplicate behavior, credit calculations, and the 72-hour reset rule.
-This adapter creates a replaceable dependency boundary without reimplementing
-any of that behavior.
+This adapter adds a replaceable boundary and a minimal readiness probe without
+reimplementing any business behavior.
 """
 
 from typing import List
@@ -58,3 +58,11 @@ class LegacyDatabaseAdapter:
             standard_credits,
             ai_credits,
         )
+
+    def check_readiness(self):
+        """Perform a small real Supabase query without inferring schema state."""
+        try:
+            self.supabase.table("profiles").select("id").limit(1).execute()
+            return True, None
+        except Exception as exc:
+            return False, f"{type(exc).__name__}: {exc}"

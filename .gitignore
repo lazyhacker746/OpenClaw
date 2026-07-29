@@ -65,3 +65,5 @@ hf-space/exports/
 hf-space/ServerBackup_*.csv
 hf-space/openclaw_leads.db
 .clarion-stage1-backup/
+
+.clarion-stage2-backup/

@@ -39,6 +39,7 @@ class ApiContractTests(unittest.TestCase):
         actual = {
             (route_path, method.upper())
             for route_path, operations in schema.get("paths", {}).items()
+            if route_path.startswith("/api/")
             for method in operations
             if method.upper() not in {"HEAD", "OPTIONS", "PARAMETERS"}
         }

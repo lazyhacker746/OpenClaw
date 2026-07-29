@@ -3,6 +3,7 @@
 from fastapi import APIRouter, BackgroundTasks
 
 from app.api.schemas import LeadRequest
+from app.core.request_context import bind_context
 from app.dependencies import generation_service
 
 
@@ -16,4 +17,5 @@ def generate_leads(request: LeadRequest, background_tasks: BackgroundTasks):
 
 @router.get("/api/status/{task_id}")
 def get_status(task_id: str):
-    return generation_service.get_status(task_id)
+    with bind_context(task_id=task_id):
+        return generation_service.get_status(task_id)

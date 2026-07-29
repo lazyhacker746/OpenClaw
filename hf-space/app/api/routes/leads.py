@@ -3,17 +3,24 @@
 from fastapi import APIRouter
 
 from app.api.schemas import DeleteRequest, UpdatePitchRequest
+from app.core.errors import normalize_exception
+from app.core.logging import get_logger
 from app.dependencies import database_adapter
 
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.post("/api/leads/bulk-delete")
 def bulk_delete_leads(request: DeleteRequest):
-    print(
-        f"\n[!] User {request.user_id} requested BULK DELETE "
-        f"for {len(request.whatsapp_links)} leads."
+    logger.info(
+        "vault_bulk_delete_requested",
+        extra={
+            "event": "vault_bulk_delete_requested",
+            "user_id": request.user_id,
+            "lead_count": len(request.whatsapp_links),
+        },
     )
 
     if not request.whatsapp_links:
@@ -25,6 +32,14 @@ def bulk_delete_leads(request: DeleteRequest):
     )
 
     if success:
+        logger.info(
+            "vault_bulk_delete_completed",
+            extra={
+                "event": "vault_bulk_delete_completed",
+                "user_id": request.user_id,
+                "deleted_count": deleted_count,
+            },
+        )
         return {
             "status": "success",
             "message": f"Successfully removed {deleted_count} leads from vault.",
@@ -34,18 +49,36 @@ def bulk_delete_leads(request: DeleteRequest):
 
 @router.get("/api/history")
 def get_history(user_id: str):
-    print(f"[+] Fetching historical leads from Cloud Vault for User {user_id}...")
+    logger.info(
+        "vault_history_requested",
+        extra={"event": "vault_history_requested", "user_id": user_id},
+    )
     try:
         leads = database_adapter.get_user_vault(user_id)
         return {"status": "success", "data": leads}
     except Exception as exc:
-        print(f"[-] Database Error: {exc}")
-        return {"status": "error", "message": str(exc)}
+        normalized = normalize_exception(exc, operation="Vault history lookup")
+        logger.exception(
+            "vault_history_failed",
+            extra={
+                "event": "vault_history_failed",
+                "user_id": user_id,
+                "error_category": normalized.category,
+                "exception_type": normalized.exception_type,
+            },
+        )
+        return {"status": "error", "message": normalized.public_message}
 
 
 @router.post("/api/leads/update-pitch")
 def update_pitch(request: UpdatePitchRequest):
-    print(f"\n[!] Saving manually edited pitch for {request.whatsapp_link}")
+    logger.info(
+        "vault_pitch_update_requested",
+        extra={
+            "event": "vault_pitch_update_requested",
+            "whatsapp_link": request.whatsapp_link,
+        },
+    )
 
     success = database_adapter.update_lead_pitch(
         request.whatsapp_link,
