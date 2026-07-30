@@ -5,6 +5,7 @@ import { supabase } from './supabaseClient';
 import 'leaflet/dist/leaflet.css';
 
 import AuthScreen from './components/auth/AuthScreen';
+import LandingPage from './components/public/LandingPage';
 import AdminGuard from './components/auth/AdminGuard';
 import Dashboard from './components/dashboard/Dashboard';
 import Navbar from './components/layout/Navbar';
@@ -32,6 +33,7 @@ function ScreenLoader({ label = 'Preparing your workspace' }) {
 export default function App() {
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [publicView, setPublicView] = useState('landing');
   const [activeTab, setActiveTab] = useState('tools');
   const [isDark, setIsDark] = useState(() => {
     const storedTheme = localStorage.getItem('theme');
@@ -61,6 +63,7 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession);
+      if (!currentSession) setPublicView('landing');
       setLoadingAuth(false);
     });
 
@@ -130,6 +133,7 @@ export default function App() {
       setUserProfile(null);
       setLeads([]);
       setActiveTab('tools');
+      setPublicView('landing');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -166,7 +170,20 @@ export default function App() {
     return (
       <>
         <Toaster position="top-center" toastOptions={toasterOptions} />
-        <AuthScreen />
+        {publicView === 'landing' ? (
+          <LandingPage
+            isDark={isDark}
+            toggleTheme={() => setIsDark((current) => !current)}
+            onSignIn={() => setPublicView('login')}
+            onStart={() => setPublicView('signup')}
+          />
+        ) : (
+          <AuthScreen
+            key={publicView}
+            initialMode={publicView}
+            onBack={() => setPublicView('landing')}
+          />
+        )}
       </>
     );
   }

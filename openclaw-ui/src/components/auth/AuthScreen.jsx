@@ -35,8 +35,8 @@ const benefits = [
   },
 ];
 
-export default function AuthScreen() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function AuthScreen({ initialMode = 'login', onBack }) {
+  const [isLogin, setIsLogin] = useState(initialMode !== 'signup');
   const [showOtp, setShowOtp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -118,7 +118,17 @@ export default function AuthScreen() {
   };
 
   return (
-    <main className="clarion-app-shell grid min-h-dvh lg:grid-cols-[1.08fr_0.92fr]">
+    <main className="clarion-app-shell relative grid min-h-dvh lg:grid-cols-[1.08fr_0.92fr]">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="clarion-focus fixed right-4 top-4 z-[1000] inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-2 text-sm font-extrabold text-slate-700 shadow-lg shadow-slate-950/10 backdrop-blur-xl transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-[#111827]/90 dark:text-slate-200 dark:shadow-black/30 dark:hover:bg-[#172033] dark:hover:text-white sm:right-6 sm:top-6"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to Clarion
+        </button>
+      )}
       <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#07101d] px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between xl:px-16">
         <div className="pointer-events-none absolute -left-40 -top-32 h-[34rem] w-[34rem] rounded-full bg-indigo-500/16 blur-[110px]" />
         <div className="pointer-events-none absolute -bottom-40 right-[-10rem] h-[32rem] w-[32rem] rounded-full bg-teal-400/12 blur-[110px]" />
